@@ -9,6 +9,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from flask_migrate import Migrate
 from sqlalchemy import Enum
 import enum
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 DATABASE_URL = os.getenv("POSTGRES_URL")
 REFRESH_TOKEN_SECRET = os.getenv("REFRESH_TOKEN_SECRET")
@@ -41,8 +45,8 @@ class Product(db.Model):
     name: Mapped[str]
     price: Mapped[float]
     quantity: Mapped[int]
-    photo: Mapped[str]
-    description: Mapped[str]
+    photo: Mapped[str] = mapped_column(nullable=True)
+    description: Mapped[str] = mapped_column(nullable=True)
 
 
 
@@ -141,6 +145,40 @@ def refresh():
         return jsonify({'message': 'Invalid refresh token'}), 401
     
 
+@app.route('/create_product', methods=['POST'])
+def create_product():
+    token = request.headers.get('Authorization')
+    if token:
+        token = token.split(' ')[1]
+        try:
+            decoded_token = jwt.decode(token, ACCESS_TOKEN_SECRET, algorithms=['HS256'])
+            username = decoded_token['sub']
+            user = db.session.query(User).filter_by(username=username).first()
+            if user.role != Role.ADMIN:
+                return jsonify({'message': 'Unauthorized'}), 401
+        except jwt.ExpiredSignatureError:
+            return jsonify({'message': 'Unauthorized'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'message': 'Unauthorized'}), 401
+    else:
+        return jsonify({'message': 'Unauthorized'}), 401
+
+    data = request.json
+    name = data.get('name')
+    price = data.get('price')
+    quantity = data.get('quantity')
+    photo = data.get('photo')
+    description = data.get('description', '')
+
+    if not name or not price or not quantity:
+        return jsonify({'message': 'Name, price, and quantity are required'}), 400
+
+    db.session.add(Product(name=name, price=price, quantity=quantity, photo=photo, description=description))
+    db.session.commit()
+
+    return jsonify({'status': 'success'}), 201
+
+
 @app.route('/get_product/<int:id>', methods=['GET'])
 def get_product(id):
     product = db.session.query(Product).filter_by(id=id).first()
@@ -189,6 +227,8 @@ def get_users():
             return jsonify({'message': 'Unauthorized'}), 401
     else:
          return jsonify({'message': 'Unauthorized'}), 401
+
+
 
 
 # @app.route('/products', methods=['GET', 'POST'])
