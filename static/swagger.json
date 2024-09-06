@@ -328,6 +328,73 @@
           }
         }
       }
+    },
+    "/buy": {
+      "post": {
+        "tags": ["Products"],
+        "summary": "Buy products",
+        "description": "Processes a purchase of products. Requires a valid JWT token in the Authorization header.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for authentication"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Order details including product IDs and quantities",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "order": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "integer" },
+                      "quantity": { "type": "integer" }
+                    },
+                    "required": ["id", "quantity"]
+                  }
+                }
+              },
+              "required": ["order"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Purchase processed successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "products": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "integer" },
+                      "quantity": { "type": "integer" }
+                    }
+                  }
+                },
+                "total_price": { "type": "number" },
+                "payment_link": { "type": "string" }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing token"
+          },
+          "404": {
+            "description": "User not found or products not found"
+          }
+        }
+      }
     }
   }
 }
