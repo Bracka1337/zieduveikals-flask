@@ -46,6 +46,10 @@ class Role(enum.Enum):
     GUEST = "GUEST"
 
 
+class Flower(enum.Enum):
+    FLOWER = "FLOWER"
+    BOUQUET = "BOUQUET"
+
 class User(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(unique=True)
@@ -62,6 +66,7 @@ class Product(db.Model):
     quantity: Mapped[int]
     photo: Mapped[str] = mapped_column(nullable=True)
     description: Mapped[str] = mapped_column(nullable=True)
+    type: Mapped[Flower] = mapped_column(Enum(Flower, native_enum=True))
 
 
 
@@ -194,11 +199,12 @@ def create_product():
     quantity = data.get('quantity')
     photo = data.get('photo')
     description = data.get('description', '')
+    flower = data.get('flower')
 
-    if not name or not price or not quantity:
-        return jsonify({'message': 'Name, price, and quantity are required'}), 400
+    if not name or not price or not quantity or not flower:
+        return jsonify({'message': 'Name, price, type, and quantity are required'}), 400
 
-    db.session.add(Product(name=name, price=price, quantity=quantity, photo=photo, description=description))
+    db.session.add(Product(name=name, price=price, quantity=quantity, photo=photo, description=description, type=flower))
     db.session.commit()
 
     return jsonify({'status': 'success'}), 201
@@ -261,6 +267,64 @@ def get_users():
 
 
 
+def filter_products(products):
+    product_ids = [product['id'] for product in products]
+    db_products = db.session.query(Product).filter(Product.id.in_(product_ids)).all()
+    db_product_dict = {db_product.id: db_product for db_product in db_products}
+
+    total_price = 0.0
+
+    for product in products[:]:
+        db_product = db_product_dict.get(product['id'])
+        if db_product:
+            if db_product.quantity < product['quantity']:
+                product['quantity'] = db_product.quantity
+            if db_product.quantity == 0:
+                products.remove(product)
+            else:
+                total_price += product['quantity'] * db_product.price
+        else:
+            products.remove(product)
+
+    return {'products': products, 'total_price': total_price}
+@app.route('/buy', methods=['POST'])
+def buy():
+    token = request.headers.get('Authorization')
+    if not token:
+        return jsonify({'message': 'Authorization token is required'}), 401
+
+    token = token.split(' ')[1]
+    try:
+        decoded_token = jwt.decode(token, ACCESS_TOKEN_SECRET, algorithms=['HS256'])
+        username = decoded_token['sub']
+        user = db.session.query(User).filter_by(username=username).first()
+
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+
+        data = request.json
+        order = data.get('order')
+
+
+        filtered = filter_products(order)
+
+
+        #create stripe payment link and add to filtered
+
+        filtered['payment_link'] = "/pay"
+
+
+        #
+        # db.session.add(Order(user_id=user_id, username=username, selected_item=selected_item, name=name, phone_number=phone_number, amount=amount))
+        # db.session.commit()
+
+
+        return jsonify(filtered), 201
+
+    except jwt.ExpiredSignatureError:
+        return jsonify({'message': 'Unauthorized'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'message': 'Unauthorized'}), 401
 
 
 
