@@ -50,6 +50,12 @@ class Flower(enum.Enum):
     FLOWER = "FLOWER"
     BOUQUET = "BOUQUET"
 
+
+class Status(enum.Enum):
+    PENDING = "PENDING"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+
 class User(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(unique=True)
@@ -69,6 +75,25 @@ class Product(db.Model):
     type: Mapped[Flower] = mapped_column(Enum(Flower, native_enum=True))
 
 
+class Order(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(db.ForeignKey('user.id'))
+    status: Mapped[Status] = mapped_column(Enum(Status, native_enum=True), default=Status.PENDING)
+    created_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)
+    user = db.relationship('User', backref='orders')
+
+
+class OrderItem(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(db.ForeignKey('order.id'))
+    product_id: Mapped[int] = mapped_column(db.ForeignKey('product.id'))
+    quantity: Mapped[int]
+    price: Mapped[float] 
+
+    order = db.relationship('Order', backref='items')
+    product = db.relationship('Product')
+
+
 
 def admin_required(f):
     @wraps(f)
@@ -82,7 +107,7 @@ def admin_required(f):
                 user = db.session.query(User).filter_by(username=username).first()
 
                 if user and user.role == Role.ADMIN:
-                    return f(*args, **kwargs)
+                    return f(user, *args, **kwargs)
                 else:
                     return jsonify({'message': 'Unauthorized'}), 401
             except jwt.ExpiredSignatureError:
@@ -92,6 +117,31 @@ def admin_required(f):
         else:
             return jsonify({'message': 'Unauthorized'}), 401
     return decorated_function
+
+
+def user_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.headers.get('Authorization')
+        if token:
+            token = token.split(' ')[1]
+            try:
+                decoded_token = jwt.decode(token, ACCESS_TOKEN_SECRET, algorithms=['HS256'])
+                username = decoded_token['sub']
+                user = db.session.query(User).filter_by(username=username).first()
+
+                if user:
+                    return f(user, *args, **kwargs)
+                else:
+                    return jsonify({'message': 'Unauthorized'}), 401
+            except jwt.ExpiredSignatureError:
+                return jsonify({'message': 'Token expired'}), 401
+            except jwt.InvalidTokenError:
+                return jsonify({'message': 'Invalid token'}), 401
+        else:
+            return jsonify({'message': 'Authorization token is required'}), 401
+    return decorated_function
+
 
 
 
@@ -192,7 +242,7 @@ def refresh():
 
 @app.route('/create_product', methods=['POST'])
 @admin_required
-def create_product():
+def create_product(user):
     data = request.json
     name = data.get('name')
     price = data.get('price')
@@ -260,8 +310,8 @@ def get_products():
 
 @app.route('/get_users', methods=['GET'])
 @admin_required
-def get_users():
-    users = db.session.query(User).all()
+def get_users(user):
+    users = db.session.query(User).filter(User.username != user.username).all()
     user_list = [{'id': u.id, 'username': u.username, 'email': u.email, 'role': u.role.value} for u in users]
     return jsonify({'users': user_list})
 
@@ -279,7 +329,7 @@ def filter_products(products):
         if db_product:
             if db_product.quantity < product['quantity']:
                 product['quantity'] = db_product.quantity
-            if db_product.quantity == 0:
+            if db_product.quantity == 0 or product['quantity'] == 0:
                 products.remove(product)
             else:
                 total_price += product['quantity'] * db_product.price
@@ -287,45 +337,75 @@ def filter_products(products):
             products.remove(product)
 
     return {'products': products, 'total_price': total_price}
+
+
+
 @app.route('/buy', methods=['POST'])
-def buy():
-    token = request.headers.get('Authorization')
-    if not token:
-        return jsonify({'message': 'Authorization token is required'}), 401
+@user_required
+def buy(user):
+    data = request.json
+    order_items = data.get('order')
 
-    token = token.split(' ')[1]
-    try:
-        decoded_token = jwt.decode(token, ACCESS_TOKEN_SECRET, algorithms=['HS256'])
-        username = decoded_token['sub']
-        user = db.session.query(User).filter_by(username=username).first()
+    filtered = filter_products(order_items)
 
-        if not user:
-            return jsonify({'message': 'User not found'}), 404
+    if not filtered['products']:
+        return jsonify({'message': 'No products found or product quantity is 0'}), 404
 
-        data = request.json
-        order = data.get('order')
+    user = db.session.query(User).filter_by(username=user.username).first()
+
+    new_order = Order(user_id=user.id)
+    db.session.add(new_order)
+    db.session.commit()  
+
+    for product in filtered['products']:
+        db.session.add(OrderItem(
+            order_id=new_order.id,
+            product_id=product['id'],
+            quantity=product['quantity'],
+            price=db.session.query(Product).filter_by(id=product['id']).first().price
+        ))
+
+    db.session.commit()
+
+    filtered['payment_link'] = "/pay"
+    return jsonify(filtered), 201
 
 
-        filtered = filter_products(order)
+@app.route('/orders', methods=['GET'])
+@user_required
+def get_orders(user):
 
+    if user.role == Role.ADMIN:
+        orders = db.session.query(Order).all()
+    else:
+        orders = db.session.query(Order).filter_by(user_id=user.id).all()
 
-        #create stripe payment link and add to filtered
-
-        filtered['payment_link'] = "/pay"
-
-
-        #
-        # db.session.add(Order(user_id=user_id, username=username, selected_item=selected_item, name=name, phone_number=phone_number, amount=amount))
-        # db.session.commit()
-
-
-        return jsonify(filtered), 201
-
-    except jwt.ExpiredSignatureError:
-        return jsonify({'message': 'Unauthorized'}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({'message': 'Unauthorized'}), 401
-
+    order_list = []
+    for order in orders:
+        order_data = {
+            'id': order.id,
+            'status': order.status.value,
+            'created_at': order.created_at.isoformat(),
+            'user': {
+                'id': order.user.id,
+                'username': order.user.username,
+                'email': order.user.email,
+                'role': order.user.role.value
+            },
+            'items': [
+                {
+                    'id': item.id,
+                    'product_id': item.product_id,
+                    'product_name': item.product.name,
+                    'quantity': item.quantity,
+                    'price': item.price
+                }
+                for item in order.items
+            ]
+        }
+        order_list.append(order_data)
+    
+    return jsonify({'orders': order_list}), 200
 
 
 
@@ -436,129 +516,6 @@ def buy():
 #     else:
 #         return jsonify({'message': 'Token is missing'}), 400
     
-# @app.route('/orders', methods=['GET', 'POST'])
-# def manage_orders():
-#     if request.method == 'GET':
-#         conn = get_db_connection()
-#         cursor = conn.cursor()
-#         cursor.execute('SELECT order_id, user_id, username, selected_item, name, phone_number, amount, created_at FROM orders')
-#         orders = cursor.fetchall()
-#         cursor.close()
-#         conn.close()
-
-#         order_list = [
-#             {
-#                 'order_id': order[0],
-#                 'user_id': order[1],
-#                 'username': order[2],
-#                 'selected_item': order[3],
-#                 'name': order[4],
-#                 'phone_number': order[5],
-#                 'amount': float(order[6]),
-#                 'created_at': order[7].isoformat()
-#             }
-#             for order in orders
-#         ]
-#         return jsonify({'orders': order_list})
-
-#     elif request.method == 'POST':
-#         data = request.json
-#         user_id = data.get('user_id')
-#         username = data.get('username')
-#         selected_item = data.get('selected_item')
-#         name = data.get('name')
-#         phone_number = data.get('phone_number', '')
-#         amount = data.get('amount')
-
-#         if not user_id or not username or not selected_item or not name or amount is None:
-#             return jsonify({'message': 'User ID, username, selected item, name, and amount are required'}), 400
-
-#         conn = get_db_connection()
-#         cursor = conn.cursor()
-#         cursor.execute(
-#             'INSERT INTO orders (user_id, username, selected_item, name, phone_number, amount) VALUES (%s, %s, %s, %s, %s, %s) RETURNING order_id',
-#             (user_id, username, selected_item, name, phone_number, amount)
-#         )
-#         order_id = cursor.fetchone()[0]
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
-
-#         return jsonify({
-#             'order_id': order_id,
-#             'user_id': user_id,
-#             'username': username,
-#             'selected_item': selected_item,
-#             'name': name,
-#             'phone_number': phone_number,
-#             'amount': float(amount),
-#             'created_at': datetime.datetime.now().isoformat()
-#         }), 201
-
-# @app.route('/orders/<int:order_id>', methods=['GET', 'PATCH', 'DELETE'])
-# def manage_order_by_id(order_id):
-#     conn = get_db_connection()
-#     cursor = conn.cursor()
-
-#     if request.method == 'GET':
-#         cursor.execute('SELECT order_id, user_id, username, selected_item, name, phone_number, amount, created_at FROM orders WHERE order_id = %s', (order_id,))
-#         order = cursor.fetchone()
-#         cursor.close()
-#         conn.close()
-
-#         if order:
-#             order_data = {
-#                 'order_id': order[0],
-#                 'user_id': order[1],
-#                 'username': order[2],
-#                 'selected_item': order[3],
-#                 'name': order[4],
-#                 'phone_number': order[5],
-#                 'amount': float(order[6]),
-#                 'created_at': order[7].isoformat()
-#             }
-#             return jsonify(order_data)
-#         else:
-#             return jsonify({'message': 'Order not found'}), 404
-
-#     elif request.method == 'PATCH':
-#         update_data = request.json
-#         set_clause = ', '.join(f"{key} = %s" for key in update_data.keys())
-#         values = list(update_data.values()) + [order_id]
-
-#         if 'created_at' in update_data:
-#             values[values.index(update_data['created_at'])] = datetime.datetime.strptime(update_data['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
-
-#         cursor.execute(f'UPDATE orders SET {set_clause} WHERE order_id = %s', values)
-#         conn.commit()
-
-#         cursor.execute('SELECT order_id, user_id, username, selected_item, name, phone_number, amount, created_at FROM orders WHERE order_id = %s', (order_id,))
-#         updated_order = cursor.fetchone()
-#         cursor.close()
-#         conn.close()
-
-#         if updated_order:
-#             order_data = {
-#                 'order_id': updated_order[0],
-#                 'user_id': updated_order[1],
-#                 'username': updated_order[2],
-#                 'selected_item': updated_order[3],
-#                 'name': updated_order[4],
-#                 'phone_number': updated_order[5],
-#                 'amount': float(updated_order[6]),
-#                 'created_at': updated_order[7].isoformat()
-#             }
-#             return jsonify(order_data)
-#         else:
-#             return jsonify({'message': 'Order not found'}), 404
-
-#     elif request.method == 'DELETE':
-#         cursor.execute('DELETE FROM orders WHERE order_id = %s', (order_id,))
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
-
-#         return '', 204
 
 # @app.route('/logs', methods=['GET'])
 # def get_logs():
