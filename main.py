@@ -12,6 +12,7 @@ import enum
 from dotenv import load_dotenv
 from functools import wraps
 
+
 load_dotenv()
 
 
@@ -25,6 +26,19 @@ CORS(app)
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+from flask_swagger_ui import get_swaggerui_blueprint
+
+SWAGGER_URL="/swagger"
+API_URL="/static/swagger.json"
+
+swagger_ui_blueprint = get_swaggerui_blueprint(
+    SWAGGER_URL,
+    API_URL,
+    config={
+        'app_name': 'ZieduVeikals'
+    }
+)
+app.register_blueprint(swagger_ui_blueprint, url_prefix=SWAGGER_URL)
 
 class Role(enum.Enum):
     ADMIN = "ADMIN"
