@@ -10,6 +10,7 @@ from flask_migrate import Migrate
 from sqlalchemy import Enum
 import enum
 from dotenv import load_dotenv
+from functools import wraps
 
 load_dotenv()
 
@@ -47,6 +48,31 @@ class Product(db.Model):
     quantity: Mapped[int]
     photo: Mapped[str] = mapped_column(nullable=True)
     description: Mapped[str] = mapped_column(nullable=True)
+
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.headers.get('Authorization')
+        if token:
+            token = token.split(' ')[1]
+            try:
+                decoded_token = jwt.decode(token, ACCESS_TOKEN_SECRET, algorithms=['HS256'])
+                username = decoded_token['sub']
+                user = db.session.query(User).filter_by(username=username).first()
+
+                if user and user.role == Role.ADMIN:
+                    return f(*args, **kwargs)
+                else:
+                    return jsonify({'message': 'Unauthorized'}), 401
+            except jwt.ExpiredSignatureError:
+                return jsonify({'message': 'Unauthorized'}), 401
+            except jwt.InvalidTokenError:
+                return jsonify({'message': 'Unauthorized'}), 401
+        else:
+            return jsonify({'message': 'Unauthorized'}), 401
+    return decorated_function
 
 
 
@@ -146,23 +172,8 @@ def refresh():
     
 
 @app.route('/create_product', methods=['POST'])
+@admin_required
 def create_product():
-    token = request.headers.get('Authorization')
-    if token:
-        token = token.split(' ')[1]
-        try:
-            decoded_token = jwt.decode(token, ACCESS_TOKEN_SECRET, algorithms=['HS256'])
-            username = decoded_token['sub']
-            user = db.session.query(User).filter_by(username=username).first()
-            if user.role != Role.ADMIN:
-                return jsonify({'message': 'Unauthorized'}), 401
-        except jwt.ExpiredSignatureError:
-            return jsonify({'message': 'Unauthorized'}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({'message': 'Unauthorized'}), 401
-    else:
-        return jsonify({'message': 'Unauthorized'}), 401
-
     data = request.json
     name = data.get('name')
     price = data.get('price')
@@ -179,10 +190,13 @@ def create_product():
     return jsonify({'status': 'success'}), 201
 
 
-@app.route('/get_product/<int:id>', methods=['GET'])
-def get_product(id):
+@app.route('/product/<int:id>', methods=['GET', 'PATCH', 'DELETE'])
+def handle_product(id):
     product = db.session.query(Product).filter_by(id=id).first()
-    if product:
+    if not product:
+        return jsonify({'message': 'Product not found'}), 404
+
+    if request.method == 'GET':
         return jsonify({
             'id': product.id,
             'name': product.name,
@@ -191,9 +205,27 @@ def get_product(id):
             'photo': product.photo,
             'description': product.description
         })
-    else:
-        return jsonify({'message': 'Product not found'}), 404
-    
+
+    return modify_or_delete_product(product)
+
+@admin_required
+def modify_or_delete_product(product):
+    if request.method == 'PATCH':
+        data = request.json
+        product.name = data.get('name', product.name)
+        product.price = data.get('price', product.price)
+        product.quantity = data.get('quantity', product.quantity)
+        product.photo = data.get('photo', product.photo)
+        product.description = data.get('description', product.description)
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': 'Product updated'}), 200
+
+    if request.method == 'DELETE':
+        db.session.delete(product)
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': 'Product deleted'}), 200
+
+
 
 @app.route('/get_products', methods=['GET'])
 def get_products():
@@ -207,127 +239,14 @@ def get_products():
 
 
 @app.route('/get_users', methods=['GET'])
+@admin_required
 def get_users():
-    token = request.headers.get('Authorization')
-    if token:
-        token = token.split(' ')[1]
-        try:
-            decoded_token = jwt.decode(token, ACCESS_TOKEN_SECRET, algorithms=['HS256'])
-            username = decoded_token['sub']
-            user = db.session.query(User).filter_by(username=username).first()
-            if user.role == Role.ADMIN:
-                users = db.session.query(User).filter(User.id != user.id).all()
-                user_list = [{'id': u.id, 'username': u.username, 'email': u.email, 'role': u.role.value} for u in users]
-                return jsonify({'users': user_list})
-            else:
-                return jsonify({'message': 'Unauthorized'}), 401
-        except jwt.ExpiredSignatureError:
-            return jsonify({'message': 'Unauthorized'}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({'message': 'Unauthorized'}), 401
-    else:
-         return jsonify({'message': 'Unauthorized'}), 401
+    users = db.session.query(User).all()
+    user_list = [{'id': u.id, 'username': u.username, 'email': u.email, 'role': u.role.value} for u in users]
+    return jsonify({'users': user_list})
 
 
 
-
-# @app.route('/products', methods=['GET', 'POST'])
-# def manage_products():
-#     if request.method == 'GET':
-#         conn = get_db_connection()
-#         cursor = conn.cursor()
-#         cursor.execute('SELECT id, name, price, quantity, photo, description FROM products')
-#         products = cursor.fetchall()
-#         cursor.close()
-#         conn.close()
-
-#         product_list = [
-#             {'id': prod[0], 'name': prod[1], 'price': float(prod[2]), 'quantity': prod[3], 'photo': prod[4], 'description': prod[5]}
-#             for prod in products
-#         ]
-#         return jsonify({'products': product_list})
-
-#     elif request.method == 'POST':
-#         data = request.json
-#         name = data.get('name')
-#         price = data.get('price')
-#         quantity = data.get('quantity')
-#         photo = data.get('photo')
-#         description = data.get('description', '')  
-
-#         if not name or not price or not quantity:
-#             return jsonify({'message': 'Name, price, and quantity are required'}), 400
-
-#         conn = get_db_connection()
-#         cursor = conn.cursor()
-#         cursor.execute(
-#             'INSERT INTO products (name, price, quantity, photo, description) VALUES (%s, %s, %s, %s, %s) RETURNING id',
-#             (name, price, quantity, photo, description)
-#         )
-#         product_id = cursor.fetchone()[0]
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
-
-#         return jsonify({'id': product_id, 'name': name, 'price': float(price), 'quantity': quantity, 'photo': photo, 'description': description}), 201
-
-# @app.route('/products/<int:id>', methods=['GET', 'PATCH', 'DELETE'])
-# def manage_product_by_id(id):
-#     conn = get_db_connection()
-#     cursor = conn.cursor()
-
-#     if request.method == 'GET':
-#         cursor.execute('SELECT id, name, price, quantity, photo, description FROM products WHERE id = %s', (id,))
-#         product = cursor.fetchone()
-#         cursor.close()
-#         conn.close()
-
-#         if product:
-#             product_data = {
-#                 'id': product[0],
-#                 'name': product[1],
-#                 'price': float(product[2]),
-#                 'quantity': product[3],
-#                 'photo': product[4], 
-#                 'description': product[5] 
-#             }
-#             return jsonify(product_data)
-#         else:
-#             return jsonify({'message': 'Product not found'}), 404
-
-#     elif request.method == 'PATCH':
-#         update_data = request.json
-#         set_clause = ', '.join(f"{key} = %s" for key in update_data.keys())
-#         values = list(update_data.values()) + [id]
-
-#         cursor.execute(f'UPDATE products SET {set_clause} WHERE id = %s', values)
-#         conn.commit()
-
-#         cursor.execute('SELECT id, name, price, quantity, photo, description FROM products WHERE id = %s', (id,))
-#         updated_product = cursor.fetchone()
-#         cursor.close()
-#         conn.close()
-
-#         if updated_product:
-#             product_data = {
-#                 'id': updated_product[0],
-#                 'name': updated_product[1],
-#                 'price': float(updated_product[2]),
-#                 'quantity': updated_product[3],
-#                 'photo': updated_product[4], 
-#                 'description': updated_product[5]
-#             }
-#             return jsonify(product_data)
-#         else:
-#             return jsonify({'message': 'Product not found'}), 404
-
-#     elif request.method == 'DELETE':
-#         cursor.execute('DELETE FROM products WHERE id = %s', (id,))
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
-
-#         return '', 204
 
 
 
