@@ -1,0 +1,333 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "API documentation for ZieduVeikals.",
+    "version": "1.0.0",
+    "title": "ZieduVeikals API"
+  },
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "Authentication related endpoints"
+    },
+    {
+      "name": "Products",
+      "description": "Product management"
+    },
+    {
+      "name": "Users",
+      "description": "User management"
+    }
+  ],
+  "schemes": ["http"],
+  "paths": {
+    "/register": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Register a new user",
+        "description": "Creates a new user account.",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "description": "User registration data",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "username": { "type": "string" },
+                "email": { "type": "string" },
+                "password": { "type": "string" }
+              },
+              "required": ["username", "email", "password"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "User created successfully"
+          },
+          "400": {
+            "description": "Username or email already exists, or missing fields"
+          }
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "User login",
+        "description": "Logs in a user and returns JWT tokens.",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "description": "User login data",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "username": { "type": "string" },
+                "password": { "type": "string" }
+              },
+              "required": ["username", "password"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Login successful, returns access and refresh tokens",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "access_token": { "type": "string" },
+                "refresh_token": { "type": "string" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        }
+      }
+    },
+    "/refresh": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Refresh access token",
+        "description": "Exchanges a refresh token for a new access token.",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Refresh token",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "refresh_token": { "type": "string" }
+              },
+              "required": ["refresh_token"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New access token generated",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "access_token": { "type": "string" },
+                "refresh_token": { "type": "string" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired refresh token"
+          }
+        }
+      }
+    },
+    "/create_product": {
+      "post": {
+        "tags": ["Products"],
+        "summary": "Create a new product",
+        "description": "Adds a new product to the inventory. Admin only.",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Product data",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "price": { "type": "number" },
+                "quantity": { "type": "integer" },
+                "photo": { "type": "string" },
+                "description": { "type": "string" }
+              },
+              "required": ["name", "price", "quantity"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Product created successfully"
+          },
+          "400": {
+            "description": "Missing fields or unauthorized access"
+          },
+          "401": {
+            "description": "Admin authorization required"
+          }
+        }
+      }
+    },
+    "/product/{id}": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Get product details",
+        "description": "Fetch details of a product by ID.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "ID of the product"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product details",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer" },
+                "name": { "type": "string" },
+                "price": { "type": "number" },
+                "quantity": { "type": "integer" },
+                "photo": { "type": "string" },
+                "description": { "type": "string" }
+              }
+            }
+          },
+          "404": {
+            "description": "Product not found"
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Products"],
+        "summary": "Update product details",
+        "description": "Modify an existing product. Admin only.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "ID of the product"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Product data",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "price": { "type": "number" },
+                "quantity": { "type": "integer" },
+                "photo": { "type": "string" },
+                "description": { "type": "string" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product updated successfully"
+          },
+          "404": {
+            "description": "Product not found"
+          },
+          "401": {
+            "description": "Admin authorization required"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Products"],
+        "summary": "Delete a product",
+        "description": "Removes a product from the inventory. Admin only.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "ID of the product"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product deleted successfully"
+          },
+          "404": {
+            "description": "Product not found"
+          },
+          "401": {
+            "description": "Admin authorization required"
+          }
+        }
+      }
+    },
+    "/get_products": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Get all products",
+        "description": "Fetch all products in the inventory.",
+        "responses": {
+          "200": {
+            "description": "List of all products",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "products": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "integer" },
+                      "name": { "type": "string" },
+                      "price": { "type": "number" },
+                      "quantity": { "type": "integer" },
+                      "photo": { "type": "string" },
+                      "description": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_users": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get all users",
+        "description": "Fetch all users. Admin only.",
+        "responses": {
+          "200": {
+            "description": "List of all users",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "users": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "integer" },
+                      "username": { "type": "string" },
+                      "email": { "type": "string" },
+                      "role": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Admin authorization required"
+          }
+        }
+      }
+    }
+  }
+}
