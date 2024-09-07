@@ -93,6 +93,12 @@ class OrderItem(db.Model):
     order = db.relationship('Order', backref='items')
     product = db.relationship('Product')
 
+class Promocode(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str]
+    discount: Mapped[float]
+    count_usage: Mapped[int]
+
 
 
 def admin_required(f):
@@ -409,112 +415,56 @@ def get_orders(user):
 
 
 
-# @app.route('/promos', methods=['GET', 'POST'])
-# def manage_promos():
-#     if request.method == 'GET':
-#         conn = get_db_connection()
-#         cursor = conn.cursor()
-#         cursor.execute('SELECT id, code, discount, count_usage FROM promos')
-#         promos = cursor.fetchall()
-#         cursor.close()
-#         conn.close()
+@app.route('/create_promocode', methods=['POST'])
+@admin_required
+def create_promocode(user):
+    data = request.json
+    code = data.get('code')
+    discount = data.get('discount')
+    count_usage = data.get('count_usage')
 
-#         promo_list = [
-#             {'id': promo[0], 'code': promo[1], 'discount': promo[2], 'count_usage': promo[3]}
-#             for promo in promos
-#         ]
-#         return jsonify({'promos': promo_list})
+    if not code or discount is None or count_usage is None:
+        return jsonify({'message': 'Code, discount, and count_usage are required'}), 400
 
-#     elif request.method == 'POST':
-#         data = request.json
-#         code = data.get('code')
-#         discount = data.get('discount')
-#         count_usage = data.get('count_usage')
+    db.session.add(Promocode(code=code, discount=discount, count_usage=count_usage))
+    db.session.commit()
 
-#         if not code or discount is None or count_usage is None:
-#             return jsonify({'message': 'Code, discount, and count_usage are required'}), 400
+    return jsonify({'status': 'success'}), 201
 
-#         conn = get_db_connection()
-#         cursor = conn.cursor()
-#         cursor.execute(
-#             'INSERT INTO promos (code, discount, count_usage) VALUES (%s, %s, %s) RETURNING id',
-#             (code, discount, count_usage)
-#         )
-#         promo_id = cursor.fetchone()[0]
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
 
-#         return jsonify({'id': promo_id, 'code': code, 'discount': discount, 'count_usage': count_usage}), 201
 
-# @app.route('/promos/<int:id>', methods=['GET', 'PATCH', 'DELETE'])
-# def manage_promo_by_id(id):
-#     conn = get_db_connection()
-#     cursor = conn.cursor()
+@app.route('/promocodes', methods=['GET'])
+@admin_required
+def get_promocodes(user):
+    promocodes = db.session.query(Promocode).all()
+    promocode_list = [{'id': p.id, 'code': p.code, 'discount': p.discount, 'count_usage': p.count_usage} for p in promocodes]
+    return jsonify({'promocodes': promocode_list})
 
-#     if request.method == 'GET':
-#         cursor.execute('SELECT id, code, discount, count_usage FROM promos WHERE id = %s', (id,))
-#         promo = cursor.fetchone()
-#         cursor.close()
-#         conn.close()
 
-#         if promo:
-#             promo_data = {
-#                 'id': promo[0],
-#                 'code': promo[1],
-#                 'discount': promo[2],
-#                 'count_usage': promo[3]
-#             }
-#             return jsonify(promo_data)
-#         else:
-#             return jsonify({'message': 'Promo not found'}), 404
 
-#     elif request.method == 'PATCH':
-#         update_data = request.json
-#         set_clause = ', '.join(f"{key} = %s" for key in update_data.keys())
-#         values = list(update_data.values()) + [id]
+@app.route('/promocode/<int:id>', methods=['PATCH', 'DELETE'])
+@admin_required
+def handle_promocode(user, id):
+    promocode = db.session.query(Promocode).filter_by(id=id).first()
+    if not promocode:
+        return jsonify({'message': 'Promocode not found'}), 404
 
-#         cursor.execute(f'UPDATE promos SET {set_clause} WHERE id = %s', values)
-#         conn.commit()
+    if request.method == 'PATCH':
+        data = request.json
+        promocode.code = data.get('code', promocode.code)
+        promocode.discount = data.get('discount', promocode.discount)
+        promocode.count_usage = data.get('count_usage', promocode.count_usage)
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': 'Promocode updated'}), 200
 
-#         cursor.execute('SELECT id, code, discount, count_usage FROM promos WHERE id = %s', (id,))
-#         updated_promo = cursor.fetchone()
-#         cursor.close()
-#         conn.close()
+    if request.method == 'DELETE':
+        db.session.delete(promocode)
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': 'Promocode deleted'}), 200
 
-#         if updated_promo:
-#             promo_data = {
-#                 'id': updated_promo[0],
-#                 'code': updated_promo[1],
-#                 'discount': updated_promo[2],
-#                 'count_usage': updated_promo[3]
-#             }
-#             return jsonify(promo_data)
-#         else:
-#             return jsonify({'message': 'Promo not found'}), 404
 
-#     elif request.method == 'DELETE':
-#         cursor.execute('DELETE FROM promos WHERE id = %s', (id,))
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
 
-#         return '', 204
 
-# @app.route('/api/logout', methods=['POST'])
-# def logout():
-#     token = request.headers.get('Authorization')
-#     if token:
-#         token = token.split(' ')[1]
-#         conn = get_db_connection()
-#         cursor = conn.cursor()
-#         cursor.execute('UPDATE users SET token = NULL WHERE token = %s', (token,))
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
-#         return jsonify({'message': 'Logged out successfully'})
-#     else:
-#         return jsonify({'message': 'Token is missing'}), 400
     
 
 # @app.route('/logs', methods=['GET'])
