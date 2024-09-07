@@ -1,8 +1,8 @@
-"""order2
+"""promos
 
-Revision ID: e1e077a2c077
+Revision ID: 1f556066de57
 Revises: 
-Create Date: 2024-09-06 18:45:37.890950
+Create Date: 2024-09-07 10:05:46.983716
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'e1e077a2c077'
+revision = '1f556066de57'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -26,6 +26,13 @@ def upgrade():
     sa.Column('photo', sa.String(), nullable=True),
     sa.Column('description', sa.String(), nullable=True),
     sa.Column('type', sa.Enum('FLOWER', 'BOUQUET', name='flower'), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('promocode',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('code', sa.String(), nullable=False),
+    sa.Column('discount', sa.Float(), nullable=False),
+    sa.Column('count_usage', sa.Integer(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user',
@@ -64,5 +71,6 @@ def downgrade():
     op.drop_table('order_item')
     op.drop_table('order')
     op.drop_table('user')
+    op.drop_table('promocode')
     op.drop_table('product')
     # ### end Alembic commands ###
