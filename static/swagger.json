@@ -17,6 +17,18 @@
     {
       "name": "Users",
       "description": "User management"
+    },
+    {
+      "name": "Cart",
+      "description": "Shopping cart operations"
+    },
+    {
+      "name": "Orders",
+      "description": "Order management"
+    },
+    {
+      "name": "Promocodes",
+      "description": "Promocode management"
     }
   ],
   "schemes": ["http"],
@@ -49,6 +61,216 @@
           },
           "400": {
             "description": "Username or email already exists, or missing fields"
+          }
+        }
+      }
+    },
+    "/orders": {
+      "get": {
+        "tags": ["Orders"],
+        "summary": "Get all orders",
+        "description": "Returns a list of orders. Admin users get all orders, while regular users get only their own orders.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of orders",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "orders": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "integer" },
+                      "status": { "type": "string" },
+                      "created_at": { "type": "string", "format": "date-time" },
+                      "user": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "integer" },
+                          "username": { "type": "string" },
+                          "email": { "type": "string" },
+                          "role": { "type": "string" }
+                        }
+                      },
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": { "type": "integer" },
+                            "product_id": { "type": "integer" },
+                            "product_name": { "type": "string" },
+                            "quantity": { "type": "integer" },
+                            "price": { "type": "number" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/create_promocode": {
+      "post": {
+        "tags": ["Promocodes"],
+        "summary": "Create a new promocode",
+        "description": "Admin can create a new promocode.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for admin authentication"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Promocode details",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": { "type": "string" },
+                "discount": { "type": "number" },
+                "count_usage": { "type": "integer" }
+              },
+              "required": ["code", "discount", "count_usage"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Promocode created successfully"
+          },
+          "400": {
+            "description": "Invalid data"
+          }
+        }
+      }
+    },
+    "/promocodes": {
+      "get": {
+        "tags": ["Promocodes"],
+        "summary": "Get all promocodes",
+        "description": "Admin can retrieve all available promocodes.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for admin authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of promocodes",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "promocodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "integer" },
+                      "code": { "type": "string" },
+                      "discount": { "type": "number" },
+                      "count_usage": { "type": "integer" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/promocode/{id}": {
+      "patch": {
+        "tags": ["Promocodes"],
+        "summary": "Update promocode",
+        "description": "Admin can update the details of an existing promocode.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for admin authentication"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Promocode ID"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Promocode details to update",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": { "type": "string" },
+                "discount": { "type": "number" },
+                "count_usage": { "type": "integer" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Promocode updated successfully"
+          },
+          "404": {
+            "description": "Promocode not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Promocodes"],
+        "summary": "Delete promocode",
+        "description": "Admin can delete a promocode by its ID.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for admin authentication"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Promocode ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Promocode deleted successfully"
+          },
+          "404": {
+            "description": "Promocode not found"
           }
         }
       }
@@ -161,6 +383,196 @@
           },
           "401": {
             "description": "Admin authorization required"
+          }
+        }
+      }
+    },
+    "/add": {
+      "post": {
+        "tags": ["Cart"],
+        "summary": "Add products to cart",
+        "description": "Adds products to the user's cart.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for authentication"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Product data",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "products": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "integer" },
+                      "quantity": { "type": "integer" }
+                    },
+                    "required": ["id", "quantity"]
+                  }
+                }
+              },
+              "required": ["products"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Products added to cart successfully"
+          },
+          "400": {
+            "description": "No products provided"
+          },
+          "404": {
+            "description": "No products found or quantity is zero"
+          }
+        }
+      }
+    },
+    "/cart": {
+      "get": {
+        "tags": ["Cart"],
+        "summary": "View cart",
+        "description": "Returns the user's cart items.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cart details returned successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "cart_items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "integer" },
+                      "product_id": { "type": "integer" },
+                      "product_name": { "type": "string" },
+                      "price": { "type": "number" },
+                      "quantity": { "type": "integer" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cart is empty"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Cart"],
+        "summary": "Clear cart",
+        "description": "Clears the user's cart.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cart cleared successfully"
+          },
+          "404": {
+            "description": "Cart is already empty"
+          }
+        }
+      }
+    },
+    "/cart/{id}": {
+      "patch": {
+        "tags": ["Cart"],
+        "summary": "Modify cart item",
+        "description": "Updates the quantity of a cart item.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for authentication"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "ID of the cart item"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "description": "New quantity for the cart item",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "quantity": { "type": "integer" }
+              },
+              "required": ["quantity"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cart item updated successfully"
+          },
+          "404": {
+            "description": "Cart item not found"
+          },
+          "400": {
+            "description": "Invalid quantity"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Cart"],
+        "summary": "Delete cart item",
+        "description": "Removes an item from the user's cart.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for authentication"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "ID of the cart item"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cart item deleted successfully"
+          },
+          "404": {
+            "description": "Cart item not found"
           }
         }
       }
@@ -341,29 +753,6 @@
             "required": true,
             "type": "string",
             "description": "Bearer token for authentication"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "description": "Order details including product IDs and quantities",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "properties": {
-                "order": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": { "type": "integer" },
-                      "quantity": { "type": "integer" }
-                    },
-                    "required": ["id", "quantity"]
-                  }
-                }
-              },
-              "required": ["order"]
-            }
           }
         ],
         "responses": {
@@ -372,17 +761,6 @@
             "schema": {
               "type": "object",
               "properties": {
-                "products": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": { "type": "integer" },
-                      "quantity": { "type": "integer" }
-                    }
-                  }
-                },
-                "total_price": { "type": "number" },
                 "payment_link": { "type": "string" }
               }
             }
