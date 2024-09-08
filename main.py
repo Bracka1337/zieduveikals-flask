@@ -14,6 +14,7 @@ import enum
 from dotenv import load_dotenv
 from functools import wraps
 
+from stripe.checkout import Session
 
 load_dotenv()
 
@@ -80,6 +81,7 @@ class Order(db.Model):
     user_id: Mapped[int] = mapped_column(db.ForeignKey('user.id'))
     status: Mapped[Status] = mapped_column(Enum(Status, native_enum=True), default=Status.PENDING)
     created_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)
+    order_id: Mapped[str] = mapped_column(unique=True)
     user = db.relationship('User', backref='orders')
 
 class OrderItem(db.Model):
@@ -448,7 +450,7 @@ def count_total_price(cart_items):
     return {'total_price': total_price, 'products': cart_items}
 
 
-def create_payment_link(filtered) -> str:
+def create_payment_link(filtered) -> Session:
     line_items = []
     for product in filtered['products']:
         line_item = {
@@ -473,7 +475,8 @@ def create_payment_link(filtered) -> str:
         cancel_url=f'https://youtube.coooom',
         client_reference_id=str(uuid.uuid4()),
     )
-    return checkout_session.url
+    return checkout_session
+
 
 
 @app.route('/buy', methods=['POST'])
@@ -485,26 +488,58 @@ def buy(user):
         return jsonify({'message': 'No products found or product quantity is 0'}), 404
 
     user = db.session.query(User).filter_by(username=user.username).first()
-    new_order = Order(user_id=user.id)
-    db.session.add(new_order)
-    db.session.commit()  
+
+    #check if there is no pending payments
+    if db.session.query(Order).filter_by(user_id=user.id, status=Status.PENDING).first():
+        return jsonify({'message': 'You have a pending order'}), 400
 
     filtered = count_total_price(order_items)
 
-    print(filtered)
+
+
+
+    res = create_payment_link(filtered)
+
+    new_order = Order(user_id=user.id, order_id=res.id)
+    db.session.add(new_order)
+    db.session.commit()
+
 
     for product in filtered['products']:
-        db.session.add(OrderItem(
-            order_id=new_order.id,
-            product_id=product.product_id,
-            quantity=product.quantity,
-            price=db.session.query(Product).filter_by(id=product.product_id).first().price
-        ))
+        db_product = db.session.query(Product).filter_by(id=product.product_id).first()
+        if db_product:
+            db_product.quantity -= product.quantity
+            db.session.commit()
+            db.session.add(OrderItem(
+                order_id=new_order.id,
+                product_id=product.product_id,
+                quantity=product.quantity,
+                price=db.session.query(Product).filter_by(id=product.product_id).first().price
+            ))
+
+
 
     db.session.commit()
 
-    return jsonify(create_payment_link(filtered)), 201
 
+    return jsonify({"payment_link" : res.url}), 201
+
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    data = request.json
+    object = data['data']['object']
+
+    if object['object'] == "checkout.session":
+        if object['payment_status'] == 'paid':
+            db.session.query(Order).filter_by(order_id=object['id']).update({'status': Status.COMPLETED})
+            db.session.query(CartItem).filter_by(user_id=db.session.query(Order).filter_by(order_id=object['id']).first().user_id).delete()
+            db.session.commit()
+        else:
+            print(object['payment_status'])
+
+
+    return object
 
 @app.route('/orders', methods=['GET'])
 @user_required
@@ -590,33 +625,6 @@ def handle_promocode(user, id):
         db.session.delete(promocode)
         db.session.commit()
         return jsonify({'status': 'success', 'message': 'Promocode deleted'}), 200
-
-
-
-
-    
-
-# @app.route('/logs', methods=['GET'])
-# def get_logs():
-#     conn = get_db_connection()
-#     cursor = conn.cursor()
-#     cursor.execute('SELECT id, log_time, module_name, log_level, username, action FROM logs')
-#     logs = cursor.fetchall()
-#     cursor.close()
-#     conn.close()
-
-#     log_list = [
-#         {
-#             'id': log[0],
-#             'log_time': log[1].isoformat(),
-#             'module_name': log[2],
-#             'log_level': log[3],
-#             'username': log[4],
-#             'action': log[5]
-#         }
-#         for log in logs
-#     ]
-#     return jsonify({'logs': log_list})
 
 if __name__ == '__main__':
     app.run(debug=True)
