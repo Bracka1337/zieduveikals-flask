@@ -49,11 +49,9 @@ class Role(enum.Enum):
     USER = "USER"
     GUEST = "GUEST"
 
-
 class Flower(enum.Enum):
     FLOWER = "FLOWER"
     BOUQUET = "BOUQUET"
-
 
 class Status(enum.Enum):
     PENDING = "PENDING"
@@ -68,10 +66,6 @@ class User(db.Model):
     refresh_token: Mapped[str] = mapped_column(nullable=True)
     role: Mapped[Role] = mapped_column(Enum(Role, native_enum=True), default=Role.USER)
 
-
-
-
-
 class Product(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
@@ -81,7 +75,6 @@ class Product(db.Model):
     description: Mapped[str] = mapped_column(nullable=True)
     type: Mapped[Flower] = mapped_column(Enum(Flower, native_enum=True))
 
-
 class Order(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(db.ForeignKey('user.id'))
@@ -89,14 +82,12 @@ class Order(db.Model):
     created_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)
     user = db.relationship('User', backref='orders')
 
-
 class OrderItem(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     order_id: Mapped[int] = mapped_column(db.ForeignKey('order.id'))
     product_id: Mapped[int] = mapped_column(db.ForeignKey('product.id'))
     quantity: Mapped[int]
     price: Mapped[float] 
-
     order = db.relationship('Order', backref='items')
     product = db.relationship('Product')
 
@@ -106,7 +97,6 @@ class Promocode(db.Model):
     discount: Mapped[float]
     count_usage: Mapped[int]
 
-
 class CartItem(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(db.ForeignKey('user.id'))
@@ -115,9 +105,6 @@ class CartItem(db.Model):
 
     user = db.relationship('User', backref='cart_items')
     product = db.relationship('Product')
-
-
-
 
 
 def admin_required(f):
@@ -143,7 +130,6 @@ def admin_required(f):
             return jsonify({'message': 'Unauthorized'}), 401
     return decorated_function
 
-
 def user_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -166,10 +152,6 @@ def user_required(f):
         else:
             return jsonify({'message': 'Authorization token is required'}), 401
     return decorated_function
-
-
-
-
 
 @app.route('/register', methods=['POST'])
 def register(): 
@@ -320,8 +302,6 @@ def modify_or_delete_product(product):
         db.session.commit()
         return jsonify({'status': 'success', 'message': 'Product deleted'}), 200
 
-
-
 @app.route('/get_products', methods=['GET'])
 def get_products():
     products = db.session.query(Product).all()
@@ -330,8 +310,6 @@ def get_products():
         for p in products
     ]
     return jsonify({'products': product_list})
-    
-
 
 @app.route('/get_users', methods=['GET'])
 @admin_required
@@ -339,8 +317,6 @@ def get_users(user):
     users = db.session.query(User).filter(User.username != user.username).all()
     user_list = [{'id': u.id, 'username': u.username, 'email': u.email, 'role': u.role.value} for u in users]
     return jsonify({'users': user_list})
-
-
 
 def filter_products(products):
     product_ids = [product['id'] for product in products]
@@ -354,6 +330,8 @@ def filter_products(products):
         if db_product:
             if db_product.quantity < product['quantity']:
                 product['quantity'] = db_product.quantity
+                product['name'] = db_product.name
+                product['description'] = db_product.description
             if db_product.quantity == 0 or product['quantity'] == 0:
                 products.remove(product)
             else:
@@ -362,8 +340,6 @@ def filter_products(products):
             products.remove(product)
 
     return {'products': products, 'total_price': total_price}
-
-
 
 @app.route('/add', methods=['POST'])
 @user_required
@@ -374,32 +350,27 @@ def add(user):
     if not products:
         return jsonify({'message': 'No products provided'}), 400
 
-    # Filter and validate the products
     filtered = filter_products(products)
 
     if not filtered['products']:
         return jsonify({'message': 'No products found or product quantity is 0'}), 404
 
-    # Add filtered products to the user's cart
     for product in filtered['products']:
         product_id = product['id']
         quantity = product['quantity']
+      
 
         cart_item = db.session.query(CartItem).filter_by(user_id=user.id, product_id=product_id).first()
 
         if cart_item:
-            # Update the quantity if the product is already in the cart
             cart_item.quantity += quantity
         else:
-            # Add a new item to the cart
             cart_item = CartItem(user_id=user.id, product_id=product_id, quantity=quantity)
             db.session.add(cart_item)
 
     db.session.commit()
 
     return jsonify({'message': 'Products added to cart', 'total_price': filtered['total_price']}), 201
-
-
 
 @app.route('/cart', methods=['GET', 'DELETE'])
 @user_required
@@ -424,18 +395,14 @@ def view_cart(user):
         if not cart_items:
             return jsonify({'message': 'Cart is already empty'}), 200
 
-        # Clear the cart by deleting all items for the user
         db.session.query(CartItem).filter_by(user_id=user.id).delete()
         db.session.commit()
 
         return jsonify({'message': 'Cart cleared successfully'}), 200
 
-
-
 @app.route('/cart/<int:id>', methods=['PATCH', 'DELETE'])
 @user_required
 def modify_or_delete_cart_item(user, id):
-    # Query for the specific cart item by id and user_id
     cart_item = db.session.query(CartItem).filter_by(id=id, user_id=user.id).first()
 
     if not cart_item:
@@ -448,34 +415,59 @@ def modify_or_delete_cart_item(user, id):
         if new_quantity is None or new_quantity < 1:
             return jsonify({'message': 'Invalid quantity'}), 400
 
-        # Update the quantity of the cart item
         cart_item.quantity = new_quantity
         db.session.commit()
 
         return jsonify({'message': 'Cart item quantity updated successfully'}), 200
 
     elif request.method == 'DELETE':
-        # Remove the cart item from the database
         db.session.delete(cart_item)
         db.session.commit()
 
         return jsonify({'message': 'Cart item deleted successfully'}), 200
 
-def create_payment_link(amount: float) -> str:
+def count_total_price(cart_items):
+    ids = [item.product_id for item in cart_items]
+    products = db.session.query(Product).filter(Product.id.in_(ids)).all()
+    product_dict = {product.id: product for product in products}
 
-    amount_in_cents = int(round(amount * 100))
+    total_price = 0.0
+
+    for item in cart_items:
+        product = product_dict.get(item.product_id)
+        if product:
+            quantity = item.quantity if item.quantity <= product.quantity else product.quantity
+            total_price += quantity * product.price
+            item.quantity = quantity
+            item.price = product.price
+            item.name = product.name
+            item.description = product.description
+            item.images = [product.photo]
+    
+
+    return {'total_price': total_price, 'products': cart_items}
+
+
+def create_payment_link(filtered) -> str:
+    line_items = []
+    for product in filtered['products']:
+        line_item = {
+            'price_data': {
+                'currency': 'eur',
+                'unit_amount': int(round(product.price * 100)),
+                'product_data': {
+                    'name': product.name,
+                    'description': product.description,
+                    'images': product.images
+                },
+            },
+            'quantity': product.quantity,
+        }
+        line_items.append(line_item)
+
     checkout_session = stripe.checkout.Session.create(
         payment_method_types=['card'],
-            line_items=[{
-                'price_data': {
-                    'currency': 'eur',
-                    'product_data': {
-                        'name': "test_desc",
-                    },
-                    'unit_amount': amount_in_cents,
-                },
-                'quantity': 1,
-            }],
+        line_items=line_items,
         mode='payment',
         success_url=f'https://youtube.com',
         cancel_url=f'https://youtube.coooom',
@@ -483,35 +475,35 @@ def create_payment_link(amount: float) -> str:
     )
     return checkout_session.url
 
+
 @app.route('/buy', methods=['POST'])
 @user_required
 def buy(user):
-    data = request.json
-    order_items = data.get('order')
+    order_items = db.session.query(CartItem).filter_by(user_id=user.id).all()
 
-    filtered = filter_products(order_items)
-
-    if not filtered['products']:
+    if not order_items:
         return jsonify({'message': 'No products found or product quantity is 0'}), 404
 
     user = db.session.query(User).filter_by(username=user.username).first()
-
     new_order = Order(user_id=user.id)
     db.session.add(new_order)
     db.session.commit()  
 
+    filtered = count_total_price(order_items)
+
+    print(filtered)
+
     for product in filtered['products']:
         db.session.add(OrderItem(
             order_id=new_order.id,
-            product_id=product['id'],
-            quantity=product['quantity'],
-            price=db.session.query(Product).filter_by(id=product['id']).first().price
+            product_id=product.product_id,
+            quantity=product.quantity,
+            price=db.session.query(Product).filter_by(id=product.product_id).first().price
         ))
 
     db.session.commit()
 
-    filtered['payment_link'] = create_payment_link(filtered["total_price"])
-    return jsonify(filtered), 201
+    return jsonify(create_payment_link(filtered)), 201
 
 
 @app.route('/orders', methods=['GET'])
