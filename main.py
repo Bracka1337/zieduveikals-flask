@@ -13,42 +13,37 @@ from sqlalchemy import Enum
 import enum
 from dotenv import load_dotenv
 from functools import wraps
-
+from flask_swagger_ui import get_swaggerui_blueprint
 from stripe.checkout import Session
 
 load_dotenv()
 
-STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
-DATABASE_URL = os.getenv("POSTGRES_URL")
 REFRESH_TOKEN_SECRET = os.getenv("REFRESH_TOKEN_SECRET")
 ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-stripe.api_key = STRIPE_SECRET_KEY
+
+
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("POSTGRES_URL")
 CORS(app)
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-from flask_swagger_ui import get_swaggerui_blueprint
-
-SWAGGER_URL="/swagger"
-API_URL="/static/swagger.json"
-
 swagger_ui_blueprint = get_swaggerui_blueprint(
-    SWAGGER_URL,
-    API_URL,
+    "/swagger",
+    "/static/swagger.json",
     config={
         'app_name': 'ZieduVeikals'
     }
 )
-app.register_blueprint(swagger_ui_blueprint, url_prefix=SWAGGER_URL)
+
+app.register_blueprint(swagger_ui_blueprint, url_prefix="/swagger")
 
 class Role(enum.Enum):
     ADMIN = "ADMIN"
     USER = "USER"
-    GUEST = "GUEST"
 
 class Flower(enum.Enum):
     FLOWER = "FLOWER"
@@ -104,56 +99,34 @@ class CartItem(db.Model):
     user_id: Mapped[int] = mapped_column(db.ForeignKey('user.id'))
     product_id: Mapped[int] = mapped_column(db.ForeignKey('product.id'))
     quantity: Mapped[int]
-
     user = db.relationship('User', backref='cart_items')
     product = db.relationship('Product')
 
 
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if token:
-            token = token.split(' ')[1]
-            try:
-                decoded_token = jwt.decode(token, ACCESS_TOKEN_SECRET, algorithms=['HS256'])
-                username = decoded_token['sub']
-                user = db.session.query(User).filter_by(username=username).first()
+def role_required(role):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            token = request.headers.get('Authorization')
+            if token:
+                token = token.split(' ')[1]
+                try:
+                    decoded_token = jwt.decode(token, ACCESS_TOKEN_SECRET, algorithms=['HS256'])
+                    username = decoded_token['sub']
+                    user = db.session.query(User).filter_by(username=username).first()
 
-                if user and user.role == Role.ADMIN:
-                    return f(user, *args, **kwargs)
-                else:
-                    return jsonify({'message': 'Unauthorized'}), 401
-            except jwt.ExpiredSignatureError:
-                return jsonify({'message': 'Unauthorized'}), 401
-            except jwt.InvalidTokenError:
-                return jsonify({'message': 'Unauthorized'}), 401
-        else:
-            return jsonify({'message': 'Unauthorized'}), 401
-    return decorated_function
-
-def user_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if token:
-            token = token.split(' ')[1]
-            try:
-                decoded_token = jwt.decode(token, ACCESS_TOKEN_SECRET, algorithms=['HS256'])
-                username = decoded_token['sub']
-                user = db.session.query(User).filter_by(username=username).first()
-
-                if user:
-                    return f(user, *args, **kwargs)
-                else:
-                    return jsonify({'message': 'Unauthorized'}), 401
-            except jwt.ExpiredSignatureError:
-                return jsonify({'message': 'Token expired'}), 401
-            except jwt.InvalidTokenError:
-                return jsonify({'message': 'Invalid token'}), 401
-        else:
-            return jsonify({'message': 'Authorization token is required'}), 401
-    return decorated_function
+                    if user and (user.role == role or role == Role.USER):
+                        return f(user, *args, **kwargs)
+                    else:
+                        return jsonify({'message': 'Unauthorized'}), 401
+                except jwt.ExpiredSignatureError:
+                    return jsonify({'message': 'Token expired'}), 401
+                except jwt.InvalidTokenError:
+                    return jsonify({'message': 'Invalid token'}), 401
+            else:
+                return jsonify({'message': 'Authorization token is required'}), 401
+        return decorated_function
+    return decorator
 
 @app.route('/register', methods=['POST'])
 def register(): 
@@ -194,13 +167,9 @@ def login():
             'sub': username,
             'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
         }, REFRESH_TOKEN_SECRET, algorithm='HS256')
-
-
         
         db.session.query(User).filter_by(username=username).update({'refresh_token': refresh_token})
-
         db.session.commit()
-
 
         access_token = jwt.encode({
             'sub': username,
@@ -250,7 +219,7 @@ def refresh():
     
 
 @app.route('/create_product', methods=['POST'])
-@admin_required
+@role_required(Role.ADMIN)
 def create_product(user):
     data = request.json
     name = data.get('name')
@@ -287,7 +256,7 @@ def handle_product(id):
 
     return modify_or_delete_product(product)
 
-@admin_required
+@role_required(Role.ADMIN)
 def modify_or_delete_product(product):
     if request.method == 'PATCH':
         data = request.json
@@ -314,7 +283,7 @@ def get_products():
     return jsonify({'products': product_list})
 
 @app.route('/get_users', methods=['GET'])
-@admin_required
+@role_required(Role.ADMIN)
 def get_users(user):
     users = db.session.query(User).filter(User.username != user.username).all()
     user_list = [{'id': u.id, 'username': u.username, 'email': u.email, 'role': u.role.value} for u in users]
@@ -344,7 +313,7 @@ def filter_products(products):
     return {'products': products, 'total_price': total_price}
 
 @app.route('/add', methods=['POST'])
-@user_required
+@role_required(Role.USER)
 def add(user):
     data = request.json
     products = data.get('products')
@@ -375,7 +344,7 @@ def add(user):
     return jsonify({'message': 'Products added to cart', 'total_price': filtered['total_price']}), 201
 
 @app.route('/cart', methods=['GET', 'DELETE'])
-@user_required
+@role_required(Role.USER)
 def view_cart(user):
     cart_items = db.session.query(CartItem).filter_by(user_id=user.id).all()
 
@@ -403,7 +372,7 @@ def view_cart(user):
         return jsonify({'message': 'Cart cleared successfully'}), 200
 
 @app.route('/cart/<int:id>', methods=['PATCH', 'DELETE'])
-@user_required
+@role_required(Role.USER)
 def modify_or_delete_cart_item(user, id):
     cart_item = db.session.query(CartItem).filter_by(id=id, user_id=user.id).first()
 
@@ -477,10 +446,8 @@ def create_payment_link(filtered) -> Session:
     )
     return checkout_session
 
-
-
 @app.route('/buy', methods=['POST'])
-@user_required
+@role_required(Role.USER)
 def buy(user):
     order_items = db.session.query(CartItem).filter_by(user_id=user.id).all()
 
@@ -489,15 +456,10 @@ def buy(user):
 
     user = db.session.query(User).filter_by(username=user.username).first()
 
-    #check if there is no pending payments
     if db.session.query(Order).filter_by(user_id=user.id, status=Status.PENDING).first():
         return jsonify({'message': 'You have a pending order'}), 400
 
     filtered = count_total_price(order_items)
-
-
-
-
     res = create_payment_link(filtered)
 
     new_order = Order(user_id=user.id, order_id=res.id)
@@ -516,11 +478,7 @@ def buy(user):
                 quantity=product.quantity,
                 price=db.session.query(Product).filter_by(id=product.product_id).first().price
             ))
-
-
-
     db.session.commit()
-
 
     return jsonify({"payment_link" : res.url}), 201
 
@@ -542,7 +500,7 @@ def webhook():
     return object
 
 @app.route('/orders', methods=['GET'])
-@user_required
+@role_required(Role.USER)
 def get_orders(user):
 
     if user.role == Role.ADMIN:
@@ -577,10 +535,8 @@ def get_orders(user):
     
     return jsonify({'orders': order_list}), 200
 
-
-
 @app.route('/create_promocode', methods=['POST'])
-@admin_required
+@role_required(Role.ADMIN)
 def create_promocode(user):
     data = request.json
     code = data.get('code')
@@ -595,19 +551,15 @@ def create_promocode(user):
 
     return jsonify({'status': 'success'}), 201
 
-
-
 @app.route('/promocodes', methods=['GET'])
-@admin_required
+@role_required(Role.ADMIN)
 def get_promocodes(user):
     promocodes = db.session.query(Promocode).all()
     promocode_list = [{'id': p.id, 'code': p.code, 'discount': p.discount, 'count_usage': p.count_usage} for p in promocodes]
     return jsonify({'promocodes': promocode_list})
 
-
-
 @app.route('/promocode/<int:id>', methods=['PATCH', 'DELETE'])
-@admin_required
+@role_required(Role.ADMIN)
 def handle_promocode(user, id):
     promocode = db.session.query(Promocode).filter_by(id=id).first()
     if not promocode:
