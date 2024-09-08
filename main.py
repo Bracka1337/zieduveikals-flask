@@ -65,6 +65,9 @@ class User(db.Model):
     role: Mapped[Role] = mapped_column(Enum(Role, native_enum=True), default=Role.USER)
 
 
+
+
+
 class Product(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
@@ -98,6 +101,18 @@ class Promocode(db.Model):
     code: Mapped[str]
     discount: Mapped[float]
     count_usage: Mapped[int]
+
+
+class CartItem(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(db.ForeignKey('user.id'))
+    product_id: Mapped[int] = mapped_column(db.ForeignKey('product.id'))
+    quantity: Mapped[int]
+
+    user = db.relationship('User', backref='cart_items')
+    product = db.relationship('Product')
+
+
 
 
 
@@ -343,6 +358,104 @@ def filter_products(products):
             products.remove(product)
 
     return {'products': products, 'total_price': total_price}
+
+
+
+@app.route('/add', methods=['POST'])
+@user_required
+def add(user):
+    data = request.json
+    products = data.get('products')
+
+    if not products:
+        return jsonify({'message': 'No products provided'}), 400
+
+    # Filter and validate the products
+    filtered = filter_products(products)
+
+    if not filtered['products']:
+        return jsonify({'message': 'No products found or product quantity is 0'}), 404
+
+    # Add filtered products to the user's cart
+    for product in filtered['products']:
+        product_id = product['id']
+        quantity = product['quantity']
+
+        cart_item = db.session.query(CartItem).filter_by(user_id=user.id, product_id=product_id).first()
+
+        if cart_item:
+            # Update the quantity if the product is already in the cart
+            cart_item.quantity += quantity
+        else:
+            # Add a new item to the cart
+            cart_item = CartItem(user_id=user.id, product_id=product_id, quantity=quantity)
+            db.session.add(cart_item)
+
+    db.session.commit()
+
+    return jsonify({'message': 'Products added to cart', 'total_price': filtered['total_price']}), 201
+
+
+
+@app.route('/cart', methods=['GET', 'DELETE'])
+@user_required
+def view_cart(user):
+    cart_items = db.session.query(CartItem).filter_by(user_id=user.id).all()
+
+    if request.method == 'GET':
+        if not cart_items:
+            return jsonify({'message': 'Cart is empty'}), 200
+
+        cart_details = [{
+            'id': item.id,
+            'product_id': item.product_id,
+            'product_name': item.product.name,
+            'price': item.product.price,
+            'quantity': item.quantity
+        } for item in cart_items]
+
+        return jsonify({'cart_items': cart_details}), 200
+
+    elif request.method == 'DELETE':
+        if not cart_items:
+            return jsonify({'message': 'Cart is already empty'}), 200
+
+        # Clear the cart by deleting all items for the user
+        db.session.query(CartItem).filter_by(user_id=user.id).delete()
+        db.session.commit()
+
+        return jsonify({'message': 'Cart cleared successfully'}), 200
+
+
+
+@app.route('/cart/<int:id>', methods=['PATCH', 'DELETE'])
+@user_required
+def modify_or_delete_cart_item(user, id):
+    # Query for the specific cart item by id and user_id
+    cart_item = db.session.query(CartItem).filter_by(id=id, user_id=user.id).first()
+
+    if not cart_item:
+        return jsonify({'message': 'Cart item not found'}), 404
+
+    if request.method == 'PATCH':
+        data = request.json
+        new_quantity = data.get('quantity')
+
+        if new_quantity is None or new_quantity < 1:
+            return jsonify({'message': 'Invalid quantity'}), 400
+
+        # Update the quantity of the cart item
+        cart_item.quantity = new_quantity
+        db.session.commit()
+
+        return jsonify({'message': 'Cart item quantity updated successfully'}), 200
+
+    elif request.method == 'DELETE':
+        # Remove the cart item from the database
+        db.session.delete(cart_item)
+        db.session.commit()
+
+        return jsonify({'message': 'Cart item deleted successfully'}), 200
 
 
 
