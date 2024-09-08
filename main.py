@@ -4,6 +4,8 @@ import bcrypt
 import jwt
 import datetime
 import os
+import stripe
+import uuid
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import Mapped, mapped_column
 from flask_migrate import Migrate
@@ -15,10 +17,12 @@ from functools import wraps
 
 load_dotenv()
 
-
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 DATABASE_URL = os.getenv("POSTGRES_URL")
 REFRESH_TOKEN_SECRET = os.getenv("REFRESH_TOKEN_SECRET")
 ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
+
+stripe.api_key = STRIPE_SECRET_KEY
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
@@ -457,7 +461,27 @@ def modify_or_delete_cart_item(user, id):
 
         return jsonify({'message': 'Cart item deleted successfully'}), 200
 
+def create_payment_link(amount: float) -> str:
 
+    amount_in_cents = int(round(amount * 100))
+    checkout_session = stripe.checkout.Session.create(
+        payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'eur',
+                    'product_data': {
+                        'name': "test_desc",
+                    },
+                    'unit_amount': amount_in_cents,
+                },
+                'quantity': 1,
+            }],
+        mode='payment',
+        success_url=f'https://youtube.com',
+        cancel_url=f'https://youtube.coooom',
+        client_reference_id=str(uuid.uuid4()),
+    )
+    return checkout_session.url
 
 @app.route('/buy', methods=['POST'])
 @user_required
@@ -486,7 +510,7 @@ def buy(user):
 
     db.session.commit()
 
-    filtered['payment_link'] = "/pay"
+    filtered['payment_link'] = create_payment_link(filtered["total_price"])
     return jsonify(filtered), 201
 
 
