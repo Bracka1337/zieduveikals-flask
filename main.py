@@ -15,6 +15,8 @@ from dotenv import load_dotenv
 from functools import wraps
 from flask_swagger_ui import get_swaggerui_blueprint
 from stripe.checkout import Session
+from flask_mail import Mail, Message
+
 
 load_dotenv()
 
@@ -27,6 +29,13 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("POSTGRES_URL")
+app.config['MAIL_SERVER'] = 'sandbox.smtp.mailtrap.io'
+app.config['MAIL_PORT'] = 2525
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
+app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME")
+app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD")
+mail = Mail(app)
 CORS(app)
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
@@ -216,6 +225,57 @@ def refresh():
         return jsonify({'message': 'Invalid refresh token'}), 401
     except jwt.InvalidTokenError:
         return jsonify({'message': 'Invalid refresh token'}), 401
+    
+
+@app.route('/change_password', methods=['PATCH'])
+@role_required(Role.USER)
+def change_password(user):
+    data = request.json
+    old_password = data.get('old_password')
+    new_password = data.get('new_password')
+
+    if not old_password or not new_password:
+        return jsonify({'message': 'Old password and new password are required'}), 400
+
+    user = db.session.query(User).filter_by(username=user.username).first()
+
+    if bcrypt.checkpw(old_password.encode('utf-8'), user.password.encode('utf-8')):
+        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        db.session.query(User).filter_by(username=user.username).update({'password': hashed_password})
+        db.session.commit()
+
+        return jsonify({'status': 'success', 'message': 'Password changed successfully'}), 200
+    else:
+        return jsonify({'message': 'Invalid old password'}), 400
+
+
+@app.route('/reset-password', methods=['POST'])
+def reset_password():
+    data = request.json
+    email = data.get('email')
+
+    
+    if not email:
+        return jsonify({'message': 'Email is required'}), 400
+    
+    user = db.session.query(User).filter_by(email=email).first()
+
+    if not user:
+        return jsonify({'message': 'Email not found'}), 400
+    
+
+    msg = Message(
+        'Hello',
+        sender="from@example.com",
+        recipients=['to@example.com'],
+        body='This is a test email sent from Flask-Mail!'
+    )
+
+    mail.send(msg)
+
+    return jsonify({'status': 'success', 'message': 'Password reset link sent to email'}), 200
+
+
     
 
 @app.route('/create_product', methods=['POST'])
