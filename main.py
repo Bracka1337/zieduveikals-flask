@@ -23,6 +23,7 @@ load_dotenv()
 REFRESH_TOKEN_SECRET = os.getenv("REFRESH_TOKEN_SECRET")
 ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+REFRESH_PASSWORD_SECRET = os.getenv("REFRESH_PASSWORD_SECRET")
 
 
 
@@ -35,6 +36,8 @@ app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME")
 app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD")
+
+
 mail = Mail(app)
 CORS(app)
 db = SQLAlchemy(app)
@@ -264,19 +267,68 @@ def reset_password():
         return jsonify({'message': 'Email not found'}), 400
     
 
+    refresh = jwt.encode({
+        'sub': user.username,
+        'email': user.email,
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
+    }, REFRESH_PASSWORD_SECRET, algorithm='HS256')
+
     msg = Message(
         'Hello',
         sender="from@example.com",
         recipients=['to@example.com'],
-        body='This is a test email sent from Flask-Mail!'
+        body=f'This is a test email sent from Flask-Mail! {refresh}'
     )
 
     mail.send(msg)
 
     return jsonify({'status': 'success', 'message': 'Password reset link sent to email'}), 200
 
+@app.route('/reset', methods=['GET', 'POST'])
+def reset():
+    if request.method == 'GET':
+        data = request.json
+        token = data.get('token')
 
-    
+        if not token:
+            return jsonify({'message': 'Token is required'}), 400
+
+        try:
+            decoded_token = jwt.decode(token, REFRESH_PASSWORD_SECRET, algorithms=['HS256'])
+            email = decoded_token['email']
+            user = db.session.query(User).filter_by(email=email).first()
+
+            if user:
+                return jsonify({'status': 'success'}), 200
+
+            return jsonify({'message': 'Invalid token'}), 400
+        except:
+            return jsonify({'message': 'Invalid token'}), 400
+
+    elif request.method == 'POST':
+        data = request.json
+        new_password = data.get('password')
+        token = data.get('token')
+
+        if not new_password or not token:
+            return jsonify({'message': 'Password and token are required'}), 400
+
+        try:
+            decoded_token = jwt.decode(token, REFRESH_PASSWORD_SECRET, algorithms=['HS256'])
+            email = decoded_token['email']
+            user = db.session.query(User).filter_by(email=email).first()
+
+            if user:
+                hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                db.session.query(User).filter_by(email=email).update({'password': hashed_password})
+                db.session.commit()
+                return jsonify({'status': 'success', 'message': 'Password reset successfully'}), 200
+
+            return jsonify({'message': 'Invalid token'}), 400
+        except:
+            return jsonify({'message': 'Invalid token'}), 400
+
+
 
 @app.route('/create_product', methods=['POST'])
 @role_required(Role.ADMIN)
