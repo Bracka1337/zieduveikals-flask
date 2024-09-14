@@ -2,7 +2,7 @@
   "swagger": "2.0",
   "info": {
     "description": "API documentation for ZieduVeikals.",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "title": "ZieduVeikals API"
   },
   "tags": [
@@ -29,6 +29,14 @@
     {
       "name": "Promocodes",
       "description": "Promocode management"
+    },
+    {
+      "name": "Password Reset",
+      "description": "Endpoints for password reset operations"
+    },
+    {
+      "name": "Payment",
+      "description": "Payment related endpoints"
     }
   ],
   "schemes": ["http"],
@@ -45,13 +53,7 @@
             "description": "User registration data",
             "required": true,
             "schema": {
-              "type": "object",
-              "properties": {
-                "username": { "type": "string" },
-                "email": { "type": "string" },
-                "password": { "type": "string" }
-              },
-              "required": ["username", "email", "password"]
+              "$ref": "#/definitions/RegisterUser"
             }
           }
         ],
@@ -61,216 +63,6 @@
           },
           "400": {
             "description": "Username or email already exists, or missing fields"
-          }
-        }
-      }
-    },
-    "/orders": {
-      "get": {
-        "tags": ["Orders"],
-        "summary": "Get all orders",
-        "description": "Returns a list of orders. Admin users get all orders, while regular users get only their own orders.",
-        "parameters": [
-          {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for authentication"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of orders",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "orders": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": { "type": "integer" },
-                      "status": { "type": "string" },
-                      "created_at": { "type": "string", "format": "date-time" },
-                      "user": {
-                        "type": "object",
-                        "properties": {
-                          "id": { "type": "integer" },
-                          "username": { "type": "string" },
-                          "email": { "type": "string" },
-                          "role": { "type": "string" }
-                        }
-                      },
-                      "items": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "id": { "type": "integer" },
-                            "product_id": { "type": "integer" },
-                            "product_name": { "type": "string" },
-                            "quantity": { "type": "integer" },
-                            "price": { "type": "number" }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/create_promocode": {
-      "post": {
-        "tags": ["Promocodes"],
-        "summary": "Create a new promocode",
-        "description": "Admin can create a new promocode.",
-        "parameters": [
-          {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for admin authentication"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "description": "Promocode details",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "properties": {
-                "code": { "type": "string" },
-                "discount": { "type": "number" },
-                "count_usage": { "type": "integer" }
-              },
-              "required": ["code", "discount", "count_usage"]
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "Promocode created successfully"
-          },
-          "400": {
-            "description": "Invalid data"
-          }
-        }
-      }
-    },
-    "/promocodes": {
-      "get": {
-        "tags": ["Promocodes"],
-        "summary": "Get all promocodes",
-        "description": "Admin can retrieve all available promocodes.",
-        "parameters": [
-          {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for admin authentication"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of promocodes",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "promocodes": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": { "type": "integer" },
-                      "code": { "type": "string" },
-                      "discount": { "type": "number" },
-                      "count_usage": { "type": "integer" }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/promocode/{id}": {
-      "patch": {
-        "tags": ["Promocodes"],
-        "summary": "Update promocode",
-        "description": "Admin can update the details of an existing promocode.",
-        "parameters": [
-          {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for admin authentication"
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "integer",
-            "description": "Promocode ID"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "description": "Promocode details to update",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "properties": {
-                "code": { "type": "string" },
-                "discount": { "type": "number" },
-                "count_usage": { "type": "integer" }
-              }
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Promocode updated successfully"
-          },
-          "404": {
-            "description": "Promocode not found"
-          }
-        }
-      },
-      "delete": {
-        "tags": ["Promocodes"],
-        "summary": "Delete promocode",
-        "description": "Admin can delete a promocode by its ID.",
-        "parameters": [
-          {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for admin authentication"
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "integer",
-            "description": "Promocode ID"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Promocode deleted successfully"
-          },
-          "404": {
-            "description": "Promocode not found"
           }
         }
       }
@@ -287,12 +79,7 @@
             "description": "User login data",
             "required": true,
             "schema": {
-              "type": "object",
-              "properties": {
-                "username": { "type": "string" },
-                "password": { "type": "string" }
-              },
-              "required": ["username", "password"]
+              "$ref": "#/definitions/LoginUser"
             }
           }
         ],
@@ -300,11 +87,7 @@
           "200": {
             "description": "Login successful, returns access and refresh tokens",
             "schema": {
-              "type": "object",
-              "properties": {
-                "access_token": { "type": "string" },
-                "refresh_token": { "type": "string" }
-              }
+              "$ref": "#/definitions/AuthTokens"
             }
           },
           "401": {
@@ -325,11 +108,7 @@
             "description": "Refresh token",
             "required": true,
             "schema": {
-              "type": "object",
-              "properties": {
-                "refresh_token": { "type": "string" }
-              },
-              "required": ["refresh_token"]
+              "$ref": "#/definitions/RefreshToken"
             }
           }
         ],
@@ -337,11 +116,7 @@
           "200": {
             "description": "New access token generated",
             "schema": {
-              "type": "object",
-              "properties": {
-                "access_token": { "type": "string" },
-                "refresh_token": { "type": "string" }
-              }
+              "$ref": "#/definitions/AuthTokens"
             }
           },
           "401": {
@@ -350,27 +125,175 @@
         }
       }
     },
-    "/create_product": {
+    "/change_password": {
+      "patch": {
+        "tags": ["Authentication"],
+        "summary": "Change user password",
+        "description": "Allows an authenticated user to change their password.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for authentication"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Password change data",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ChangePassword"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Password changed successfully"
+          },
+          "400": {
+            "description": "Invalid input data"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/reset-password": {
+      "post": {
+        "tags": ["Password Reset"],
+        "summary": "Initiate password reset",
+        "description": "Sends a password reset link to the user's email.",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Email for password reset",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ResetPasswordRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Password reset link sent to email"
+          },
+          "400": {
+            "description": "Email is required or not found"
+          }
+        }
+      }
+    },
+    "/reset": {
+      "get": {
+        "tags": ["Password Reset"],
+        "summary": "Verify password reset token",
+        "description": "Verifies the validity of the password reset token.",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "description": "Password reset token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token is valid"
+          },
+          "400": {
+            "description": "Invalid or missing token"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Password Reset"],
+        "summary": "Reset password",
+        "description": "Resets the user's password using the provided token.",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "description": "New password and reset token",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ResetPassword"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Password reset successfully"
+          },
+          "400": {
+            "description": "Invalid input data or token"
+          }
+        }
+      }
+    },
+    "/webhook": {
+      "post": {
+        "tags": ["Payment"],
+        "summary": "Stripe webhook",
+        "description": "Handles Stripe webhook events related to payment status.",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Stripe webhook event data",
+            "required": true,
+            "schema": {
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook received successfully"
+          },
+          "400": {
+            "description": "Invalid webhook data"
+          }
+        }
+      }
+    },
+    "/products": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Get all products",
+        "description": "Fetch all products in the inventory.",
+        "responses": {
+          "200": {
+            "description": "List of all products",
+            "schema": {
+              "$ref": "#/definitions/ProductList"
+            }
+          }
+        }
+      },
       "post": {
         "tags": ["Products"],
         "summary": "Create a new product",
         "description": "Adds a new product to the inventory. Admin only.",
         "parameters": [
           {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for admin authentication"
+          },
+          {
             "name": "body",
             "in": "body",
             "description": "Product data",
             "required": true,
             "schema": {
-              "type": "object",
-              "properties": {
-                "name": { "type": "string" },
-                "price": { "type": "number" },
-                "quantity": { "type": "integer" },
-                "photo": { "type": "string" },
-                "description": { "type": "string" }
-              },
-              "required": ["name", "price", "quantity"]
+              "$ref": "#/definitions/CreateProduct"
             }
           }
         ],
@@ -379,10 +302,173 @@
             "description": "Product created successfully"
           },
           "400": {
-            "description": "Missing fields or unauthorized access"
+            "description": "Missing fields or invalid data"
           },
           "401": {
             "description": "Admin authorization required"
+          }
+        }
+      }
+    },
+    "/product/{id}": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Get product details",
+        "description": "Fetch details of a product by ID.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "ID of the product"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product details",
+            "schema": {
+              "$ref": "#/definitions/Product"
+            }
+          },
+          "404": {
+            "description": "Product not found"
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Products"],
+        "summary": "Update product details",
+        "description": "Modify an existing product. Admin only.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for admin authentication"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "ID of the product"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Product data to update",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/UpdateProduct"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product updated successfully"
+          },
+          "400": {
+            "description": "Invalid input data"
+          },
+          "401": {
+            "description": "Admin authorization required"
+          },
+          "404": {
+            "description": "Product not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Products"],
+        "summary": "Delete a product",
+        "description": "Removes a product from the inventory. Admin only.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for admin authentication"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "ID of the product"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product deleted successfully"
+          },
+          "401": {
+            "description": "Admin authorization required"
+          },
+          "404": {
+            "description": "Product not found"
+          }
+        }
+      }
+    },
+    "/get_users": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get all users",
+        "description": "Fetch all users. Admin only.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for admin authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of all users",
+            "schema": {
+              "$ref": "#/definitions/UserList"
+            }
+          },
+          "401": {
+            "description": "Admin authorization required"
+          }
+        }
+      }
+    },
+    "/buy": {
+      "post": {
+        "tags": ["Payment"],
+        "summary": "Buy products",
+        "description": "Processes a purchase of products. Requires a valid JWT token in the Authorization header.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for authentication"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Purchase processed successfully",
+            "schema": {
+              "$ref": "#/definitions/PurchaseResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing token"
+          },
+          "404": {
+            "description": "User not found or products not found"
+          },
+          "400": {
+            "description": "Pending order exists or other bad request"
           }
         }
       }
@@ -406,33 +492,25 @@
             "description": "Product data",
             "required": true,
             "schema": {
-              "type": "object",
-              "properties": {
-                "products": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": { "type": "integer" },
-                      "quantity": { "type": "integer" }
-                    },
-                    "required": ["id", "quantity"]
-                  }
-                }
-              },
-              "required": ["products"]
+              "$ref": "#/definitions/AddToCart"
             }
           }
         ],
         "responses": {
           "201": {
-            "description": "Products added to cart successfully"
+            "description": "Products added to cart successfully",
+            "schema": {
+              "$ref": "#/definitions/AddToCartResponse"
+            }
           },
           "400": {
             "description": "No products provided"
           },
           "404": {
             "description": "No products found or quantity is zero"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       }
@@ -455,26 +533,14 @@
           "200": {
             "description": "Cart details returned successfully",
             "schema": {
-              "type": "object",
-              "properties": {
-                "cart_items": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": { "type": "integer" },
-                      "product_id": { "type": "integer" },
-                      "product_name": { "type": "string" },
-                      "price": { "type": "number" },
-                      "quantity": { "type": "integer" }
-                    }
-                  }
-                }
-              }
+              "$ref": "#/definitions/CartResponse"
             }
           },
           "404": {
             "description": "Cart is empty"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       },
@@ -497,6 +563,9 @@
           },
           "404": {
             "description": "Cart is already empty"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       }
@@ -527,23 +596,22 @@
             "description": "New quantity for the cart item",
             "required": true,
             "schema": {
-              "type": "object",
-              "properties": {
-                "quantity": { "type": "integer" }
-              },
-              "required": ["quantity"]
+              "$ref": "#/definitions/ModifyCartItem"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Cart item updated successfully"
+            "description": "Cart item quantity updated successfully"
+          },
+          "400": {
+            "description": "Invalid quantity"
           },
           "404": {
             "description": "Cart item not found"
           },
-          "400": {
-            "description": "Invalid quantity"
+          "401": {
+            "description": "Unauthorized"
           }
         }
       },
@@ -573,179 +641,18 @@
           },
           "404": {
             "description": "Cart item not found"
-          }
-        }
-      }
-    },
-    "/product/{id}": {
-      "get": {
-        "tags": ["Products"],
-        "summary": "Get product details",
-        "description": "Fetch details of a product by ID.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "integer",
-            "description": "ID of the product"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Product details",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "id": { "type": "integer" },
-                "name": { "type": "string" },
-                "price": { "type": "number" },
-                "quantity": { "type": "integer" },
-                "photo": { "type": "string" },
-                "description": { "type": "string" }
-              }
-            }
-          },
-          "404": {
-            "description": "Product not found"
-          }
-        }
-      },
-      "patch": {
-        "tags": ["Products"],
-        "summary": "Update product details",
-        "description": "Modify an existing product. Admin only.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "integer",
-            "description": "ID of the product"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "description": "Product data",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "properties": {
-                "name": { "type": "string" },
-                "price": { "type": "number" },
-                "quantity": { "type": "integer" },
-                "photo": { "type": "string" },
-                "description": { "type": "string" }
-              }
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Product updated successfully"
-          },
-          "404": {
-            "description": "Product not found"
           },
           "401": {
-            "description": "Admin authorization required"
-          }
-        }
-      },
-      "delete": {
-        "tags": ["Products"],
-        "summary": "Delete a product",
-        "description": "Removes a product from the inventory. Admin only.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "integer",
-            "description": "ID of the product"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Product deleted successfully"
-          },
-          "404": {
-            "description": "Product not found"
-          },
-          "401": {
-            "description": "Admin authorization required"
+            "description": "Unauthorized"
           }
         }
       }
     },
-    "/get_products": {
+    "/orders": {
       "get": {
-        "tags": ["Products"],
-        "summary": "Get all products",
-        "description": "Fetch all products in the inventory.",
-        "responses": {
-          "200": {
-            "description": "List of all products",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "products": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": { "type": "integer" },
-                      "name": { "type": "string" },
-                      "price": { "type": "number" },
-                      "quantity": { "type": "integer" },
-                      "photo": { "type": "string" },
-                      "description": { "type": "string" }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/get_users": {
-      "get": {
-        "tags": ["Users"],
-        "summary": "Get all users",
-        "description": "Fetch all users. Admin only.",
-        "responses": {
-          "200": {
-            "description": "List of all users",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "users": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": { "type": "integer" },
-                      "username": { "type": "string" },
-                      "email": { "type": "string" },
-                      "role": { "type": "string" }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Admin authorization required"
-          }
-        }
-      }
-    },
-    "/buy": {
-      "post": {
-        "tags": ["Products"],
-        "summary": "Buy products",
-        "description": "Processes a purchase of products. Requires a valid JWT token in the Authorization header.",
+        "tags": ["Orders"],
+        "summary": "Get all orders",
+        "description": "Returns a list of orders. Admin users get all orders, while regular users get only their own orders.",
         "parameters": [
           {
             "name": "Authorization",
@@ -756,23 +663,419 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": "Purchase processed successfully",
+          "200": {
+            "description": "List of orders",
             "schema": {
-              "type": "object",
-              "properties": {
-                "payment_link": { "type": "string" }
-              }
+              "$ref": "#/definitions/OrderList"
             }
           },
           "401": {
-            "description": "Unauthorized - Invalid or missing token"
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/promocodes": {
+      "get": {
+        "tags": ["Promocodes"],
+        "summary": "Get all promocodes",
+        "description": "Admin can retrieve all available promocodes.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for admin authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of promocodes",
+            "schema": {
+              "$ref": "#/definitions/PromocodeList"
+            }
+          },
+          "401": {
+            "description": "Admin authorization required"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Promocodes"],
+        "summary": "Create a new promocode",
+        "description": "Admin can create a new promocode.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for admin authentication"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Promocode details",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CreatePromocode"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Promocode created successfully"
+          },
+          "400": {
+            "description": "Invalid data or promocode already exists"
+          },
+          "401": {
+            "description": "Admin authorization required"
+          }
+        }
+      }
+    },
+    "/promocode/{id}": {
+      "post": {
+        "tags": ["Promocodes"],
+        "summary": "Apply promocode",
+        "description": "Allows a user to apply a promocode to their account.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for authentication"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "Promocode code to apply"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Promocode applied successfully"
           },
           "404": {
-            "description": "User not found or products not found"
+            "description": "Promocode not found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Unauthorized to apply promocode"
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Promocodes"],
+        "summary": "Update promocode",
+        "description": "Admin can update the details of an existing promocode.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for admin authentication"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "Promocode code to update"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Promocode details to update",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/UpdatePromocode"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Promocode updated successfully"
+          },
+          "404": {
+            "description": "Promocode not found"
+          },
+          "401": {
+            "description": "Admin authorization required"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Promocodes"],
+        "summary": "Delete promocode",
+        "description": "Admin can delete a promocode by its code.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Bearer token for admin authentication"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "Promocode code to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Promocode deleted successfully"
+          },
+          "404": {
+            "description": "Promocode not found"
+          },
+          "401": {
+            "description": "Admin authorization required"
           }
         }
       }
     }
-  }
+  },
+  "definitions": {
+    "RegisterUser": {
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "password": { "type": "string", "format": "password" }
+      },
+      "required": ["username", "email", "password"]
+    },
+    "LoginUser": {
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "password": { "type": "string", "format": "password" }
+      },
+      "required": ["username", "password"]
+    },
+    "AuthTokens": {
+      "type": "object",
+      "properties": {
+        "access_token": { "type": "string" },
+        "refresh_token": { "type": "string" }
+      }
+    },
+    "RefreshToken": {
+      "type": "object",
+      "properties": {
+        "refresh_token": { "type": "string" }
+      },
+      "required": ["refresh_token"]
+    },
+    "ChangePassword": {
+      "type": "object",
+      "properties": {
+        "old_password": { "type": "string", "format": "password" },
+        "new_password": { "type": "string", "format": "password" }
+      },
+      "required": ["old_password", "new_password"]
+    },
+    "ResetPasswordRequest": {
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" }
+      },
+      "required": ["email"]
+    },
+    "ResetPassword": {
+      "type": "object",
+      "properties": {
+        "password": { "type": "string", "format": "password" },
+        "token": { "type": "string" }
+      },
+      "required": ["password", "token"]
+    },
+    "Product": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "quantity": { "type": "integer" },
+        "photo": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "ProductList": {
+      "type": "object",
+      "properties": {
+        "products": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Product" }
+        }
+      }
+    },
+    "CreateProduct": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "quantity": { "type": "integer" },
+        "photo": { "type": "string" },
+        "description": { "type": "string" },
+        "flower": { "type": "string", "enum": ["FLOWER", "BOUQUET"] }
+      },
+      "required": ["name", "price", "quantity", "flower", "description"]
+    },
+    "UpdateProduct": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "quantity": { "type": "integer" },
+        "photo": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "User": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "username": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["ADMIN", "USER"] },
+        "promocode": {
+          "$ref": "#/definitions/Promocode"
+        }
+      }
+    },
+    "UserList": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/User" }
+        }
+      }
+    },
+    "Promocode": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "code": { "type": "string" },
+        "discount": { "type": "number" },
+        "count_usage": { "type": "integer" }
+      }
+    },
+    "PromocodeList": {
+      "type": "object",
+      "properties": {
+        "promocodes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Promocode" }
+        }
+      }
+    },
+    "CreatePromocode": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "discount": { "type": "number" },
+        "count_usage": { "type": "integer" }
+      },
+      "required": ["code", "discount", "count_usage"]
+    },
+    "UpdatePromocode": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "discount": { "type": "number" },
+        "count_usage": { "type": "integer" }
+      }
+    },
+    "AddToCart": {
+      "type": "object",
+      "properties": {
+        "products": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "integer" },
+              "quantity": { "type": "integer" }
+            },
+            "required": ["id", "quantity"]
+          }
+        }
+      },
+      "required": ["products"]
+    },
+    "AddToCartResponse": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" },
+        "total_price": { "type": "number" }
+      }
+    },
+    "CartItem": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "product_id": { "type": "integer" },
+        "product_name": { "type": "string" },
+        "price": { "type": "number" },
+        "quantity": { "type": "integer" }
+      }
+    },
+    "CartResponse": {
+      "type": "object",
+      "properties": {
+        "cart_items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/CartItem" }
+        },
+        "promocode": {
+          "type": "object",
+          "properties": {
+            "code": { "type": "string" },
+            "discount": { "type": "number" }
+          },
+          "nullable": true
+        }
+      }
+    },
+    "ModifyCartItem": {
+      "type": "object",
+      "properties": {
+        "quantity": { "type": "integer" }
+      },
+      "required": ["quantity"]
+    },
+    "PurchaseResponse": {
+      "type": "object",
+      "properties": {
+        "payment_link": { "type": "string" }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "Bearer": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "description": "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\""
+    }
+  },
+  "security": [
+    {
+      "Bearer": []
+    }
+  ]
 }
