@@ -1,8 +1,8 @@
-"""stripe
+"""promos
 
-Revision ID: df58f6dae637
+Revision ID: a2db8566c009
 Revises: 
-Create Date: 2024-09-08 19:41:47.546804
+Create Date: 2024-09-14 23:38:06.148243
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'df58f6dae637'
+revision = 'a2db8566c009'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -41,7 +41,9 @@ def upgrade():
     sa.Column('email', sa.String(), nullable=False),
     sa.Column('password', sa.String(), nullable=False),
     sa.Column('refresh_token', sa.String(), nullable=True),
-    sa.Column('role', sa.Enum('ADMIN', 'USER', 'GUEST', name='role'), nullable=False),
+    sa.Column('role', sa.Enum('ADMIN', 'USER', name='role'), nullable=False),
+    sa.Column('current_promocode_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['current_promocode_id'], ['promocode.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('username')
     )
@@ -59,10 +61,10 @@ def upgrade():
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('status', sa.Enum('PENDING', 'COMPLETED', 'CANCELLED', name='status'), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.Column('username', sa.String(), nullable=False),
+    sa.Column('order_id', sa.String(), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('username')
+    sa.UniqueConstraint('order_id')
     )
     op.create_table('order_item',
     sa.Column('id', sa.Integer(), nullable=False),
