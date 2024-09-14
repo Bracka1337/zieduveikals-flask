@@ -24,6 +24,7 @@ REFRESH_TOKEN_SECRET = os.getenv("REFRESH_TOKEN_SECRET")
 ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 REFRESH_PASSWORD_SECRET = os.getenv("REFRESH_PASSWORD_SECRET")
+MODE = os.getenv("MODE", "production").lower()
 
 
 
@@ -70,9 +71,13 @@ class User(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(unique=True)
     email: Mapped[str]
-    password: Mapped[str] 
+    password: Mapped[str]
     refresh_token: Mapped[str] = mapped_column(nullable=True)
     role: Mapped[Role] = mapped_column(Enum(Role, native_enum=True), default=Role.USER)
+    promocode_id: Mapped[int] = mapped_column(db.ForeignKey('promocode.id'), nullable=True)
+    current_promocode = db.relationship('Promocode', backref='users')
+
+
 
 class Product(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -89,6 +94,8 @@ class Order(db.Model):
     status: Mapped[Status] = mapped_column(Enum(Status, native_enum=True), default=Status.PENDING)
     created_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)
     order_id: Mapped[str] = mapped_column(unique=True)
+    promocode_id: Mapped[int] = mapped_column(db.ForeignKey('promocode.id'), nullable=True)
+    promocode = db.relationship('Promocode')
     user = db.relationship('User', backref='orders')
 
 class OrderItem(db.Model):
@@ -329,27 +336,6 @@ def reset():
             return jsonify({'message': 'Invalid token'}), 400
 
 
-
-@app.route('/create_product', methods=['POST'])
-@role_required(Role.ADMIN)
-def create_product(user):
-    data = request.json
-    name = data.get('name')
-    price = data.get('price')
-    quantity = data.get('quantity')
-    photo = data.get('photo')
-    description = data.get('description', '')
-    flower = data.get('flower')
-
-    if not name or not price or not quantity or not flower:
-        return jsonify({'message': 'Name, price, type, and quantity are required'}), 400
-
-    db.session.add(Product(name=name, price=price, quantity=quantity, photo=photo, description=description, type=flower))
-    db.session.commit()
-
-    return jsonify({'status': 'success'}), 201
-
-
 @app.route('/product/<int:id>', methods=['GET', 'PATCH', 'DELETE'])
 def handle_product(id):
     product = db.session.query(Product).filter_by(id=id).first()
@@ -369,7 +355,7 @@ def handle_product(id):
     return modify_or_delete_product(product)
 
 @role_required(Role.ADMIN)
-def modify_or_delete_product(product):
+def modify_or_delete_product(user, product):
     if request.method == 'PATCH':
         data = request.json
         product.name = data.get('name', product.name)
@@ -385,20 +371,58 @@ def modify_or_delete_product(product):
         db.session.commit()
         return jsonify({'status': 'success', 'message': 'Product deleted'}), 200
 
-@app.route('/get_products', methods=['GET'])
-def get_products():
-    products = db.session.query(Product).all()
-    product_list = [
-        {'id': p.id, 'name': p.name, 'price': p.price, 'quantity': p.quantity, 'photo': p.photo, 'description': p.description}
-        for p in products
-    ]
-    return jsonify({'products': product_list})
+@app.route('/products', methods=['GET', 'POST'])
+def products():
+    if request.method == 'GET':
+        products = Product.query.all()
+        return jsonify({'products': [{
+            'id': p.id, 'name': p.name, 'price': p.price, 
+            'quantity': p.quantity, 'photo': p.photo, 'description': p.description
+        } for p in products]}), 200
+    
+    return create_product()
+
+   
+
+
+@role_required(Role.ADMIN)
+def create_product(current_user: User):
+    if(current_user.role != Role.ADMIN):
+        return jsonify({'message': 'Unauthorized'}), 403
+
+    data = request.json
+    required = {'name', 'price', 'quantity', 'flower', 'description'}
+    if not required.issubset(data):
+        return jsonify({'message': 'Name, price, quantity, description, and type are required'}), 400
+    product = Product(
+        name=data['name'], price=data['price'], quantity=data['quantity'],
+        photo=data.get('photo'), description=data['description'],
+        type=data['flower']
+    )
+    db.session.add(product)
+    db.session.commit()
+    return jsonify({'status': 'success'}), 201
 
 @app.route('/get_users', methods=['GET'])
 @role_required(Role.ADMIN)
 def get_users(user):
     users = db.session.query(User).filter(User.username != user.username).all()
-    user_list = [{'id': u.id, 'username': u.username, 'email': u.email, 'role': u.role.value} for u in users]
+    user_list = []
+    for u in users:
+        promocode_data = {
+            'id': u.current_promocode.id,
+            'code': u.current_promocode.code,
+            'discount': u.current_promocode.discount,
+            'count_usage': u.current_promocode.count_usage
+        } if u.current_promocode else None
+
+        user_list.append({
+            'id': u.id,
+            'username': u.username,
+            'email': u.email,
+            'role': u.role.value,
+            'promocode': promocode_data
+        })
     return jsonify({'users': user_list})
 
 def filter_products(products):
@@ -472,7 +496,12 @@ def view_cart(user):
             'quantity': item.quantity
         } for item in cart_items]
 
-        return jsonify({'cart_items': cart_details}), 200
+        promocode = {
+            'code': user.current_promocode.code,
+            'discount': user.current_promocode.discount,
+        } if user.current_promocode else None
+
+        return jsonify({'cart_items': cart_details, 'promocode': promocode}), 200
 
     elif request.method == 'DELETE':
         if not cart_items:
@@ -527,17 +556,16 @@ def count_total_price(cart_items):
             item.description = product.description
             item.images = [product.photo]
     
-
     return {'total_price': total_price, 'products': cart_items}
 
 
-def create_payment_link(filtered) -> Session:
+def create_payment_link(filtered, promocode) -> Session:
     line_items = []
     for product in filtered['products']:
         line_item = {
             'price_data': {
                 'currency': 'eur',
-                'unit_amount': int(round(product.price * 100)),
+                'unit_amount': round(int(product.price * 100) * (1 - promocode.discount/100)) if promocode else int(round(product.price * 100)),
                 'product_data': {
                     'name': product.name,
                     'description': product.description,
@@ -572,9 +600,13 @@ def buy(user):
         return jsonify({'message': 'You have a pending order'}), 400
 
     filtered = count_total_price(order_items)
-    res = create_payment_link(filtered)
+    res = create_payment_link(filtered, user.current_promocode)
 
     new_order = Order(user_id=user.id, order_id=res.id)
+    new_order.promocode_id = user.current_promocode.id if user.current_promocode else None
+    if user.current_promocode:
+        user.current_promocode.count_usage -= 1
+    user.current_promocode = None
     db.session.add(new_order)
     db.session.commit()
 
@@ -614,7 +646,6 @@ def webhook():
 @app.route('/orders', methods=['GET'])
 @role_required(Role.USER)
 def get_orders(user):
-
     if user.role == Role.ADMIN:
         orders = db.session.query(Order).all()
     else:
@@ -622,6 +653,14 @@ def get_orders(user):
 
     order_list = []
     for order in orders:
+        # Serialize promocode data if available
+        promocode_data = {
+            'id': order.promocode.id,
+            'code': order.promocode.code,
+            'discount': order.promocode.discount,
+            'count_usage': order.promocode.count_usage
+        } if order.promocode else None
+
         order_data = {
             'id': order.id,
             'status': order.status.value,
@@ -632,6 +671,7 @@ def get_orders(user):
                 'email': order.user.email,
                 'role': order.user.role.value
             },
+            'promocode': promocode_data,  # Add promocode data here
             'items': [
                 {
                     'id': item.id,
@@ -647,35 +687,63 @@ def get_orders(user):
     
     return jsonify({'orders': order_list}), 200
 
-@app.route('/create_promocode', methods=['POST'])
+
+@app.route('/promocodes', methods=['POST', 'GET'])
 @role_required(Role.ADMIN)
-def create_promocode(user):
-    data = request.json
-    code = data.get('code')
-    discount = data.get('discount')
-    count_usage = data.get('count_usage')
+def promocodes(current_user):
+    if request.method == 'GET':
+        promos = Promocode.query.all()
+        return jsonify({'promocodes': [{
+            'id': p.id, 'code': p.code, 
+            'discount': p.discount, 'count_usage': p.count_usage
+        } for p in promos]}), 200
 
-    if not code or discount is None or count_usage is None:
-        return jsonify({'message': 'Code, discount, and count_usage are required'}), 400
+    if request.method == 'POST':
+        data = request.json
+        if not all(k in data for k in ('code', 'discount', 'count_usage')):
+            return jsonify({'message': 'Code, discount, and count_usage are required'}), 400
+        if Promocode.query.filter_by(code=data['code']).first():
+            return jsonify({'message': 'Promocode already exists'}), 400
+        promo = Promocode(
+            code=data['code'], 
+            discount=data['discount'], 
+            count_usage=data['count_usage']
+        )
+        db.session.add(promo)
+        db.session.commit()
+        return jsonify({'status': 'success'}), 201
 
-    db.session.add(Promocode(code=code, discount=discount, count_usage=count_usage))
-    db.session.commit()
-
-    return jsonify({'status': 'success'}), 201
-
-@app.route('/promocodes', methods=['GET'])
-@role_required(Role.ADMIN)
-def get_promocodes(user):
-    promocodes = db.session.query(Promocode).all()
-    promocode_list = [{'id': p.id, 'code': p.code, 'discount': p.discount, 'count_usage': p.count_usage} for p in promocodes]
-    return jsonify({'promocodes': promocode_list})
-
-@app.route('/promocode/<int:id>', methods=['PATCH', 'DELETE'])
-@role_required(Role.ADMIN)
+@app.route('/promocode/<string:id>', methods=['PATCH', 'DELETE', 'POST'])
+@role_required(Role.USER)
 def handle_promocode(user, id):
-    promocode = db.session.query(Promocode).filter_by(id=id).first()
+    if not id:
+        if user.current_promocode:
+            user.current_promocode.count_usage += 1
+        user.current_promocode = None
+
+    promocode = db.session.query(Promocode).filter_by(code=id).first()
     if not promocode:
         return jsonify({'message': 'Promocode not found'}), 404
+    
+    if request.method == 'POST':
+
+        if user.current_promocode:
+            user.current_promocode.count_usage += 1
+
+        user.current_promocode = promocode
+        promocode.count_usage -= 1
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': 'Promocode applied'}), 200
+        
+    
+    return edit_delete_promocode(promocode, user)
+
+
+   
+    
+def edit_delete_promocode(promocode, user):
+    if (user.role != Role.ADMIN):
+        return jsonify({'message': 'Unauthorized'}), 403
 
     if request.method == 'PATCH':
         data = request.json
@@ -689,6 +757,22 @@ def handle_promocode(user, id):
         db.session.delete(promocode)
         db.session.commit()
         return jsonify({'status': 'success', 'message': 'Promocode deleted'}), 200
+
+
+if MODE == "dev":
+    @app.route('/make_admin', methods=['POST'])
+    @role_required(Role.USER)
+    def make_admin(current_user):
+        target_user = User.query.filter_by(username=current_user.username).first()
+        if not target_user:
+            return jsonify({'message': 'User not found'}), 404
+
+        target_user.role = Role.ADMIN
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': f'User {current_user.username} is now an admin'}), 200
+
+    print("Development mode enabled: /make_admin route is available.")
+
 
 if __name__ == '__main__':
     app.run(debug=True)
