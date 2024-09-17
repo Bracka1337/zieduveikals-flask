@@ -62,7 +62,7 @@
             "description": "User created successfully"
           },
           "400": {
-            "description": "Username or email already exists, or missing fields"
+            "description": "Username already exists or missing fields"
           }
         }
       }
@@ -194,11 +194,13 @@
         "description": "Verifies the validity of the password reset token.",
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
+            "name": "body",
+            "in": "body",
+            "description": "Password reset token",
             "required": true,
-            "type": "string",
-            "description": "Password reset token"
+            "schema": {
+              "$ref": "#/definitions/ResetToken"
+            }
           }
         ],
         "responses": {
@@ -444,7 +446,7 @@
       "post": {
         "tags": ["Payment"],
         "summary": "Buy products",
-        "description": "Processes a purchase of products. Requires a valid JWT token in the Authorization header.",
+        "description": "Processes a purchase of products from the cart.",
         "parameters": [
           {
             "name": "Authorization",
@@ -461,14 +463,14 @@
               "$ref": "#/definitions/PurchaseResponse"
             }
           },
+          "400": {
+            "description": "Pending order exists or other bad request"
+          },
           "401": {
             "description": "Unauthorized - Invalid or missing token"
           },
           "404": {
-            "description": "User not found or products not found"
-          },
-          "400": {
-            "description": "Pending order exists or other bad request"
+            "description": "No products found or product quantity is zero"
           }
         }
       }
@@ -536,9 +538,6 @@
               "$ref": "#/definitions/CartResponse"
             }
           },
-          "404": {
-            "description": "Cart is empty"
-          },
           "401": {
             "description": "Unauthorized"
           }
@@ -561,9 +560,7 @@
           "200": {
             "description": "Cart cleared successfully"
           },
-          "404": {
-            "description": "Cart is already empty"
-          },
+      
           "401": {
             "description": "Unauthorized"
           }
@@ -766,9 +763,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Unauthorized to apply promocode"
           }
         }
       },
@@ -902,6 +896,13 @@
       },
       "required": ["password", "token"]
     },
+    "ResetToken": {
+      "type": "object",
+      "properties": {
+        "token": { "type": "string" }
+      },
+      "required": ["token"]
+    },
     "Product": {
       "type": "object",
       "properties": {
@@ -1029,9 +1030,12 @@
       "properties": {
         "id": { "type": "integer" },
         "product_id": { "type": "integer" },
-        "product_name": { "type": "string" },
+        "name": { "type": "string" },
         "price": { "type": "number" },
-        "quantity": { "type": "integer" }
+        "photo": { "type": "string" },
+        "quantity": { "type": "integer" },
+        "actual_quantity": { "type": "integer" },
+        "message": { "type": "string", "nullable": true }
       }
     },
     "CartResponse": {
@@ -1062,6 +1066,39 @@
       "type": "object",
       "properties": {
         "payment_link": { "type": "string" }
+      }
+    },
+    "Order": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "status": { "type": "string", "enum": ["PENDING", "COMPLETED", "CANCELLED"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "user": { "$ref": "#/definitions/User" },
+        "promocode": { "$ref": "#/definitions/Promocode" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/OrderItem" }
+        }
+      }
+    },
+    "OrderItem": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "product_id": { "type": "integer" },
+        "product_name": { "type": "string" },
+        "quantity": { "type": "integer" },
+        "price": { "type": "number" }
+      }
+    },
+    "OrderList": {
+      "type": "object",
+      "properties": {
+        "orders": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Order" }
+        }
       }
     }
   },
