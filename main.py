@@ -5,6 +5,7 @@ import jwt
 import datetime
 import os
 import stripe
+import time
 import uuid
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import Mapped, mapped_column
@@ -558,6 +559,7 @@ def count_total_price(cart_items):
     
     return {'total_price': total_price, 'products': cart_items}
 
+current_time = int(time.time())
 
 def create_payment_link(filtered, promocode) -> Session:
     line_items = []
@@ -583,6 +585,7 @@ def create_payment_link(filtered, promocode) -> Session:
         success_url=f'https://youtube.com',
         cancel_url=f'https://youtube.coooom',
         client_reference_id=str(uuid.uuid4()),
+        expires_at=current_time + 1800,
     )
     return checkout_session
 
@@ -630,18 +633,25 @@ def buy(user):
 @app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.json
-    object = data['data']['object']
+    event_type = data.get('type')
+    obj = data['data']['object']
 
-    if object['object'] == "checkout.session":
-        if object['payment_status'] == 'paid':
-            db.session.query(Order).filter_by(order_id=object['id']).update({'status': Status.COMPLETED})
-            db.session.query(CartItem).filter_by(user_id=db.session.query(Order).filter_by(order_id=object['id']).first().user_id).delete()
+    if event_type == 'checkout.session.completed':
+        if obj['payment_status'] == 'paid':
+            db.session.query(Order).filter_by(order_id=obj['id']).update({'status': Status.COMPLETED})
+            user_id = db.session.query(Order).filter_by(order_id=obj['id']).first().user_id
+            db.session.query(CartItem).filter_by(user_id=user_id).delete()
             db.session.commit()
-        else:
-            print(object['payment_status'])
+        return {"status": "success", "message": "Payment completed."}, 200
 
+    elif event_type == 'checkout.session.expired':
+        order_id = obj['id']
+        db.session.query(Order).filter_by(order_id=order_id).update({'status': Status.CANCELLED})
+        db.session.commit()
 
-    return object
+        return {"status": "success", "message": "Order cancelled due to session expiration."}, 200
+
+    return {"status": "error", "message": "Unhandled event type."}, 400
 
 @app.route('/orders', methods=['GET'])
 @role_required(Role.USER)
