@@ -696,7 +696,7 @@ def count_total_price(cart_items):
         new_item = {}
         if product and product.quantity > 0:
             new_item["product_id"] = product.id
-            new_item["quantity"] = item.quantity
+            new_item["quantity"] = min(item.quantity, product.quantity)
             new_item["price"] = product.price
             new_item["name"] = product.name
             new_item["description"] = product.description
@@ -738,7 +738,7 @@ def create_payment_link(filtered, promocode) -> Session:
         success_url=f"https://youtube.com",
         cancel_url=f"https://youtube.coooom",
         client_reference_id=str(uuid.uuid4()),
-        expires_at=current_time + 1800,
+        expires_at=current_time + 2000,
     )
     return checkout_session
 
