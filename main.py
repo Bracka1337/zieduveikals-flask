@@ -480,29 +480,46 @@ def add(user):
 
     return jsonify({'message': 'Products added to cart', 'total_price': filtered['total_price']}), 201
 
+
 @app.route('/cart', methods=['GET', 'DELETE'])
 @role_required(Role.USER)
 def view_cart(user):
     cart_items = db.session.query(CartItem).filter_by(user_id=user.id).all()
+    products = db.session.query(Product).all()
+    product_dict = {product.id: product for product in products}
 
     if request.method == 'GET':
         if not cart_items:
             return jsonify({'message': 'Cart is empty'}), 200
 
-        cart_details = [{
-            'id': item.id,
-            'product_id': item.product_id,
-            'product_name': item.product.name,
-            'price': item.product.price,
-            'quantity': item.quantity
-        } for item in cart_items]
+        serialized_cart_items = []
+        for item in cart_items:
+            product = product_dict.get(item.product_id)
+            if product:
+                quantity = min(item.quantity, product.quantity)
+
+                serialized_item = {
+                    'id': item.id,
+                    'product_id': product.id,
+                    'name': product.name,
+                    'price': product.price,
+                    'photo': product.photo,
+                    'quantity': item.quantity,
+                    'actual_quantity': product.quantity,
+                    'message': 'Product quantity updated' if quantity < item.quantity else None
+                }
+                serialized_cart_items.append(serialized_item)
+            else:
+                db.session.delete(item)
+
+        db.session.commit()
 
         promocode = {
             'code': user.current_promocode.code,
             'discount': user.current_promocode.discount,
         } if user.current_promocode else None
 
-        return jsonify({'cart_items': cart_details, 'promocode': promocode}), 200
+        return jsonify({'cart_items': serialized_cart_items, 'promocode': promocode}), 200
 
     elif request.method == 'DELETE':
         if not cart_items:
@@ -513,10 +530,12 @@ def view_cart(user):
 
         return jsonify({'message': 'Cart cleared successfully'}), 200
 
+
 @app.route('/cart/<int:id>', methods=['PATCH', 'DELETE'])
 @role_required(Role.USER)
 def modify_or_delete_cart_item(user, id):
     cart_item = db.session.query(CartItem).filter_by(id=id, user_id=user.id).first()
+    product = db.session.query(Product).filter_by(id=cart_item.product_id).first()
 
     if not cart_item:
         return jsonify({'message': 'Cart item not found'}), 404
@@ -525,7 +544,7 @@ def modify_or_delete_cart_item(user, id):
         data = request.json
         new_quantity = data.get('quantity')
 
-        if new_quantity is None or new_quantity < 1:
+        if new_quantity is None or new_quantity < 1 or product.quantity < new_quantity:
             return jsonify({'message': 'Invalid quantity'}), 400
 
         cart_item.quantity = new_quantity
@@ -546,18 +565,23 @@ def count_total_price(cart_items):
 
     total_price = 0.0
 
+    new_cart_items = []
+
     for item in cart_items:
         product = product_dict.get(item.product_id)
-        if product:
-            quantity = item.quantity if item.quantity <= product.quantity else product.quantity
-            total_price += quantity * product.price
-            item.quantity = quantity
-            item.price = product.price
-            item.name = product.name
-            item.description = product.description
-            item.images = [product.photo]
-    
-    return {'total_price': total_price, 'products': cart_items}
+        print(product, product.quantity)
+        new_item = {}
+        if product and product.quantity > 0:
+            new_item['product_id'] = product.id
+            new_item['quantity'] = item.quantity
+            new_item['price'] = product.price
+            new_item['name'] = product.name
+            new_item['description'] = product.description
+            new_item['images'] = [product.photo]
+            total_price += item.quantity * product.price
+            new_cart_items.append(new_item)
+
+    return {'total_price': total_price, 'products': new_cart_items}
 
 current_time = int(time.time())
 
@@ -603,6 +627,11 @@ def buy(user):
         return jsonify({'message': 'You have a pending order'}), 400
 
     filtered = count_total_price(order_items)
+    print(filtered)
+    if len(filtered['products']) == 0:
+        return jsonify({'message': 'No products found or product quantity is 0'}), 404
+
+
     res = create_payment_link(filtered, user.current_promocode)
 
     new_order = Order(user_id=user.id, order_id=res.id)
@@ -645,13 +674,21 @@ def webhook():
         return {"status": "success", "message": "Payment completed."}, 200
 
     elif event_type == 'checkout.session.expired':
-        order_id = obj['id']
-        db.session.query(Order).filter_by(order_id=order_id).update({'status': Status.CANCELLED})
-        db.session.commit()
+        order = db.session.query(Order).filter_by(order_id=obj['id']).first()
+        if order:
+            order.status = Status.CANCELLED
+
+            for item in order.items:
+                product = db.session.query(Product).filter_by(id=item.product_id).first()
+                if product:
+                    product.quantity += item.quantity
+
+            db.session.commit()
 
         return {"status": "success", "message": "Order cancelled due to session expiration."}, 200
 
     return {"status": "error", "message": "Unhandled event type."}, 400
+
 
 @app.route('/orders', methods=['GET'])
 @role_required(Role.USER)
@@ -663,7 +700,6 @@ def get_orders(user):
 
     order_list = []
     for order in orders:
-        # Serialize promocode data if available
         promocode_data = {
             'id': order.promocode.id,
             'code': order.promocode.code,
