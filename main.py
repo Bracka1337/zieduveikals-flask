@@ -39,7 +39,7 @@ app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
 
 
 mail = Mail(app)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
