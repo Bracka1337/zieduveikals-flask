@@ -18,7 +18,6 @@ from flask_swagger_ui import get_swaggerui_blueprint
 from stripe.checkout import Session
 from flask_mail import Mail, Message
 
-
 load_dotenv()
 
 REFRESH_TOKEN_SECRET = os.getenv("REFRESH_TOKEN_SECRET")
@@ -26,7 +25,6 @@ ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 REFRESH_PASSWORD_SECRET = os.getenv("REFRESH_PASSWORD_SECRET")
 MODE = os.getenv("MODE", "production").lower()
-
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("POSTGRES_URL")
@@ -36,7 +34,6 @@ app.config["MAIL_USE_TLS"] = True
 app.config["MAIL_USE_SSL"] = False
 app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
 app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
-
 
 mail = Mail(app)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -49,22 +46,24 @@ swagger_ui_blueprint = get_swaggerui_blueprint(
 
 app.register_blueprint(swagger_ui_blueprint, url_prefix="/swagger")
 
-
 class Role(enum.Enum):
     ADMIN = "ADMIN"
     USER = "USER"
 
-
 class Flower(enum.Enum):
     FLOWER = "FLOWER"
     BOUQUET = "BOUQUET"
-
 
 class Status(enum.Enum):
     PENDING = "PENDING"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
 
+class OptionType(enum.Enum):
+    COLOR = "COLOR"
+    SIZE = "SIZE"
+    MATERIAL = "MATERIAL"
+    OTHER = "OTHER"
 
 class User(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -78,7 +77,6 @@ class User(db.Model):
     )
     current_promocode = db.relationship("Promocode", backref="users")
 
-
 class Product(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
@@ -87,7 +85,20 @@ class Product(db.Model):
     photo: Mapped[str] = mapped_column(nullable=True)
     description: Mapped[str] = mapped_column(nullable=True)
     type: Mapped[Flower] = mapped_column(Enum(Flower, native_enum=True))
+    options = db.relationship("Option", backref="product", cascade="all, delete-orphan")
 
+class Option(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    description: Mapped[str] = mapped_column(nullable=True)
+    type: Mapped[OptionType] = mapped_column(Enum(OptionType, native_enum=True))
+    product_id: Mapped[int] = mapped_column(db.ForeignKey("product.id"))
+    images = db.relationship("Image", backref="option", cascade="all, delete-orphan")
+
+class Image(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    url: Mapped[str]
+    option_id: Mapped[int] = mapped_column(db.ForeignKey("option.id"))
 
 class Order(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -105,7 +116,6 @@ class Order(db.Model):
     promocode = db.relationship("Promocode")
     user = db.relationship("User", backref="orders")
 
-
 class OrderItem(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     order_id: Mapped[int] = mapped_column(db.ForeignKey("order.id"))
@@ -115,13 +125,11 @@ class OrderItem(db.Model):
     order = db.relationship("Order", backref="items")
     product = db.relationship("Product")
 
-
 class Promocode(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str]
     discount: Mapped[float]
     count_usage: Mapped[int]
-
 
 class CartItem(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -130,7 +138,6 @@ class CartItem(db.Model):
     quantity: Mapped[int]
     user = db.relationship("User", backref="cart_items")
     product = db.relationship("Product")
-
 
 def role_required(role):
     def decorator(f):
@@ -161,7 +168,6 @@ def role_required(role):
 
     return decorator
 
-
 @app.route("/register", methods=["POST"])
 def register():
     data = request.json
@@ -187,7 +193,6 @@ def register():
     db.session.commit()
 
     return jsonify({"status": "success"}), 201
-
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -227,7 +232,6 @@ def login():
         return jsonify({"refresh_token": refresh_token, "access_token": access_token})
     else:
         return jsonify({"message": "Invalid credentials"}), 401
-
 
 @app.route("/refresh", methods=["POST"])
 def refresh():
@@ -279,7 +283,6 @@ def refresh():
     except jwt.InvalidTokenError:
         return jsonify({"message": "Invalid refresh token"}), 401
 
-
 @app.route("/change_password", methods=["PATCH"])
 @role_required(Role.USER)
 def change_password(user):
@@ -308,7 +311,6 @@ def change_password(user):
     else:
         return jsonify({"message": "Invalid old password"}), 400
 
-
 @app.route("/reset-password", methods=["POST"])
 def reset_password():
     data = request.json
@@ -333,10 +335,10 @@ def reset_password():
     )
 
     msg = Message(
-        "Hello",
+        "Password Reset Request",
         sender="from@example.com",
-        recipients=["to@example.com"],
-        body=f"This is a test email sent from Flask-Mail! {refresh}",
+        recipients=[user.email],
+        body=f"Click the link below to reset your password:\n\nhttps://yourdomain.com/reset?token={refresh}",
     )
 
     mail.send(msg)
@@ -346,11 +348,10 @@ def reset_password():
         200,
     )
 
-
 @app.route("/reset", methods=["GET", "POST"])
 def reset():
     if request.method == "GET":
-        data = request.json
+        data = request.args  # Changed from request.json to request.args for GET
         token = data.get("token")
 
         if not token:
@@ -364,10 +365,12 @@ def reset():
             user = db.session.query(User).filter_by(email=email).first()
 
             if user:
-                return jsonify({"status": "success"}), 200
+                return jsonify({"status": "success", "message": "Token is valid"}), 200
 
             return jsonify({"message": "Invalid token"}), 400
-        except:
+        except jwt.ExpiredSignatureError:
+            return jsonify({"message": "Token has expired"}), 400
+        except jwt.InvalidTokenError:
             return jsonify({"message": "Invalid token"}), 400
 
     elif request.method == "POST":
@@ -401,9 +404,10 @@ def reset():
                 )
 
             return jsonify({"message": "Invalid token"}), 400
-        except:
+        except jwt.ExpiredSignatureError:
+            return jsonify({"message": "Token has expired"}), 400
+        except jwt.InvalidTokenError:
             return jsonify({"message": "Invalid token"}), 400
-
 
 @app.route("/product/<int:id>", methods=["GET", "PATCH", "DELETE"])
 def handle_product(id):
@@ -412,29 +416,85 @@ def handle_product(id):
         return jsonify({"message": "Product not found"}), 404
 
     if request.method == "GET":
-        return jsonify(
-            {
-                "id": product.id,
-                "name": product.name,
-                "price": product.price,
-                "quantity": product.quantity,
-                "photo": product.photo,
-                "description": product.description,
-            }
-        )
+        product_data = {
+            "id": product.id,
+            "name": product.name,
+            "price": product.price,
+            "quantity": product.quantity,
+            "photo": product.photo,
+            "description": product.description,
+            "type": product.type.value,
+            "options": [
+                {
+                    "id": option.id,
+                    "name": option.name,
+                    "description": option.description,
+                    "type": option.type.value,
+                    "images": [image.url for image in option.images],
+                }
+                for option in product.options
+            ],
+        }
+        return jsonify(product_data), 200
 
     return modify_or_delete_product(product)
-
 
 @role_required(Role.ADMIN)
 def modify_or_delete_product(user, product):
     if request.method == "PATCH":
         data = request.json
+
         product.name = data.get("name", product.name)
         product.price = data.get("price", product.price)
         product.quantity = data.get("quantity", product.quantity)
         product.photo = data.get("photo", product.photo)
         product.description = data.get("description", product.description)
+        product_type = data.get("type")
+        if product_type:
+            try:
+                product.type = Flower(product_type)
+            except ValueError:
+                return jsonify({"message": "Invalid product type"}), 400
+
+        # Handle options if provided
+        options_data = data.get("options")
+        if options_data:
+            for option in options_data:
+                option_id = option.get("id")
+                if option_id:
+                    # Update existing option
+                    existing_option = db.session.query(Option).filter_by(id=option_id, product_id=product.id).first()
+                    if existing_option:
+                        existing_option.name = option.get("name", existing_option.name)
+                        existing_option.description = option.get("description", existing_option.description)
+                        option_type = option.get("type")
+                        if option_type:
+                            try:
+                                existing_option.type = OptionType(option_type)
+                            except ValueError:
+                                return jsonify({"message": "Invalid option type"}), 400
+                        # Handle images
+                        images = option.get("images")
+                        if images:
+                            # Clear existing images and add new ones
+                            existing_option.images = []
+                            for img_url in images:
+                                existing_option.images.append(Image(url=img_url))
+                else:
+                    # Create new option
+                    new_option = Option(
+                        name=option["name"],
+                        description=option.get("description"),
+                        type=OptionType(option["type"]),
+                        product=product
+                    )
+                    images = option.get("images", [])
+                    for img_url in images:
+                        new_option.images.append(Image(url=img_url))
+                    db.session.add(new_option)
+
+        # Optionally handle deletion of options if needed
+
         db.session.commit()
         return jsonify({"status": "success", "message": "Product updated"}), 200
 
@@ -443,32 +503,35 @@ def modify_or_delete_product(user, product):
         db.session.commit()
         return jsonify({"status": "success", "message": "Product deleted"}), 200
 
-
 @app.route("/products", methods=["GET", "POST"])
 def products():
     if request.method == "GET":
         products = Product.query.all()
-        return (
-            jsonify(
-                {
-                    "products": [
-                        {
-                            "id": p.id,
-                            "name": p.name,
-                            "price": p.price,
-                            "quantity": p.quantity,
-                            "photo": p.photo,
-                            "description": p.description,
-                        }
-                        for p in products
-                    ]
-                }
-            ),
-            200,
-        )
+        products_data = [
+            {
+                "id": p.id,
+                "name": p.name,
+                "price": p.price,
+                "quantity": p.quantity,
+                "photo": p.photo,
+                "description": p.description,
+                "type": p.type.value,
+                "options": [
+                    {
+                        "id": option.id,
+                        "name": option.name,
+                        "description": option.description,
+                        "type": option.type.value,
+                        "images": [image.url for image in option.images],
+                    }
+                    for option in p.options
+                ],
+            }
+            for p in products
+        ]
+        return jsonify({"products": products_data}), 200
 
     return create_product()
-
 
 @role_required(Role.ADMIN)
 def create_product(current_user: User):
@@ -476,7 +539,7 @@ def create_product(current_user: User):
         return jsonify({"message": "Unauthorized"}), 403
 
     data = request.json
-    required = {"name", "price", "quantity", "flower", "description"}
+    required = {"name", "price", "quantity", "type", "description"}
     if not required.issubset(data):
         return (
             jsonify(
@@ -484,18 +547,48 @@ def create_product(current_user: User):
             ),
             400,
         )
+
+    # Validate product type
+    try:
+        product_type = Flower(data["type"])
+    except ValueError:
+        return jsonify({"message": "Invalid product type"}), 400
+
     product = Product(
         name=data["name"],
         price=data["price"],
         quantity=data["quantity"],
         photo=data.get("photo"),
         description=data["description"],
-        type=data["flower"],
+        type=product_type,
     )
+
+    # Handle options if provided
+    options_data = data.get("options", [])
+    for option in options_data:
+        option_name = option.get("name")
+        option_type = option.get("type")
+        if not option_name or not option_type:
+            return jsonify({"message": "Each option must have a name and type"}), 400
+        try:
+            option_enum = OptionType(option_type)
+        except ValueError:
+            return jsonify({"message": f"Invalid option type: {option_type}"}), 400
+
+        new_option = Option(
+            name=option_name,
+            description=option.get("description"),
+            type=option_enum,
+            product=product
+        )
+        images = option.get("images", [])
+        for img_url in images:
+            new_option.images.append(Image(url=img_url))
+        db.session.add(new_option)
+
     db.session.add(product)
     db.session.commit()
     return jsonify({"status": "success"}), 201
-
 
 @app.route("/get_users", methods=["GET"])
 @role_required(Role.ADMIN)
@@ -525,7 +618,6 @@ def get_users(user):
         )
     return jsonify({"users": user_list})
 
-
 def filter_products(products):
     product_ids = [product["id"] for product in products]
     db_products = db.session.query(Product).filter(Product.id.in_(product_ids)).all()
@@ -548,7 +640,6 @@ def filter_products(products):
             products.remove(product)
 
     return {"products": products, "total_price": total_price}
-
 
 @app.route("/add", methods=["POST"])
 @role_required(Role.USER)
@@ -593,7 +684,6 @@ def add(user):
         ),
         201,
     )
-
 
 @app.route("/cart", methods=["GET", "DELETE"])
 @role_required(Role.USER)
@@ -653,15 +743,17 @@ def view_cart(user):
 
         return jsonify({"message": "Cart cleared successfully"}), 200
 
-
 @app.route("/cart/<int:id>", methods=["PATCH", "DELETE"])
 @role_required(Role.USER)
 def modify_or_delete_cart_item(user, id):
     cart_item = db.session.query(CartItem).filter_by(id=id, user_id=user.id).first()
-    product = db.session.query(Product).filter_by(id=cart_item.product_id).first()
-
     if not cart_item:
         return jsonify({"message": "Cart item not found"}), 404
+
+    product = db.session.query(Product).filter_by(id=cart_item.product_id).first()
+
+    if not product:
+        return jsonify({"message": "Associated product not found"}), 404
 
     if request.method == "PATCH":
         data = request.json
@@ -681,7 +773,6 @@ def modify_or_delete_cart_item(user, id):
 
         return jsonify({"message": "Cart item deleted successfully"}), 200
 
-
 def count_total_price(cart_items):
     ids = [item.product_id for item in cart_items]
     products = db.session.query(Product).filter(Product.id.in_(ids)).all()
@@ -700,15 +791,13 @@ def count_total_price(cart_items):
             new_item["price"] = product.price
             new_item["name"] = product.name
             new_item["description"] = product.description
-            new_item["images"] = [product.photo]
+            new_item["images"] = [product.photo]  # You might want to include more images
             total_price += item.quantity * product.price
             new_cart_items.append(new_item)
 
     return {"total_price": total_price, "products": new_cart_items}
 
-
 current_time = int(time.time())
-
 
 def create_payment_link(filtered, promocode) -> Session:
     line_items = []
@@ -724,7 +813,8 @@ def create_payment_link(filtered, promocode) -> Session:
                 "product_data": {
                     "name": product["name"],
                     "description": product["description"],
-                    "images": product["images"],
+                    # If you have multiple images, you can provide the first one or handle accordingly
+                    "images": [product["images"][0]] if product["images"] else [],
                 },
             },
             "quantity": product["quantity"],
@@ -735,13 +825,12 @@ def create_payment_link(filtered, promocode) -> Session:
         payment_method_types=["card"],
         line_items=line_items,
         mode="payment",
-        success_url=f"https://youtube.com",
-        cancel_url=f"https://youtube.coooom",
+        success_url=f"https://yourdomain.com/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"https://yourdomain.com/cancel",
         client_reference_id=str(uuid.uuid4()),
         expires_at=current_time + 2000,
     )
     return checkout_session
-
 
 @app.route("/buy", methods=["POST"])
 @role_required(Role.USER)
@@ -789,16 +878,12 @@ def buy(user):
                     order_id=new_order.id,
                     product_id=product["product_id"],
                     quantity=product["quantity"],
-                    price=db.session.query(Product)
-                    .filter_by(id=product["product_id"])
-                    .first()
-                    .price,
+                    price=db_product.price,
                 )
             )
     db.session.commit()
 
     return jsonify({"payment_link": res.url}), 201
-
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -838,7 +923,6 @@ def webhook():
         }, 200
 
     return {"status": "error", "message": "Unhandled event type."}, 400
-
 
 @app.route("/orders", methods=["GET"])
 @role_required(Role.USER)
@@ -887,7 +971,6 @@ def get_orders(user):
 
     return jsonify({"orders": order_list}), 200
 
-
 @app.route("/promocodes", methods=["POST", "GET"])
 @role_required(Role.ADMIN)
 def promocodes(current_user):
@@ -928,7 +1011,6 @@ def promocodes(current_user):
         db.session.commit()
         return jsonify({"status": "success"}), 201
 
-
 @app.route("/promocode/<string:id>", methods=["PATCH", "DELETE", "POST"])
 @role_required(Role.USER)
 def handle_promocode(user, id):
@@ -953,7 +1035,6 @@ def handle_promocode(user, id):
 
     return edit_delete_promocode(promocode, user)
 
-
 def edit_delete_promocode(promocode, user):
     if user.role != Role.ADMIN:
         return jsonify({"message": "Unauthorized"}), 403
@@ -970,7 +1051,6 @@ def edit_delete_promocode(promocode, user):
         db.session.delete(promocode)
         db.session.commit()
         return jsonify({"status": "success", "message": "Promocode deleted"}), 200
-
 
 if MODE == "dev":
 
@@ -994,7 +1074,6 @@ if MODE == "dev":
         )
 
     print("Development mode enabled: /make_admin route is available.")
-
 
 if __name__ == "__main__":
     app.run(debug=True)
