@@ -19,6 +19,7 @@ from stripe.checkout import Session
 from flask_mail import Mail, Message
 import redis
 
+
 load_dotenv()
 
 redis_url = os.getenv("REDIS_URL")
@@ -62,6 +63,13 @@ class Status(enum.Enum):
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
 
+
+class OptionType(enum.Enum):
+    COLOR = "COLOR"
+    SIZE = "SIZE"
+    MATERIAL = "MATERIAL"
+    OTHER = "OTHER"
+
 class User(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(unique=True)
@@ -79,6 +87,21 @@ class Product(db.Model):
     photo: Mapped[str] = mapped_column(nullable=True)
     description: Mapped[str] = mapped_column(nullable=True)
     type: Mapped[Flower] = mapped_column(Enum(Flower, native_enum=True))
+    options = db.relationship("Option", backref="product", cascade="all, delete-orphan")
+
+class Option(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    description: Mapped[str] = mapped_column(nullable=True)
+    type: Mapped[OptionType] = mapped_column(Enum(OptionType, native_enum=True))
+    product_id: Mapped[int] = mapped_column(db.ForeignKey("product.id"))
+    images = db.relationship("Image", backref="option", cascade="all, delete-orphan")
+
+class Image(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    url: Mapped[str]
+    option_id: Mapped[int] = mapped_column(db.ForeignKey("option.id"))
+
 
 class Order(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -300,6 +323,7 @@ def reset_password():
     )
 
     msg = Message(
+
         "Password Reset",
         sender="from@example.com",
         recipients=[user.email],
@@ -330,10 +354,12 @@ def reset():
             user = db.session.query(User).filter_by(email=email).first()
 
             if user:
-                return jsonify({"status": "success"}), 200
+                return jsonify({"status": "success", "message": "Token is valid"}), 200
 
             return jsonify({"message": "Invalid token"}), 400
-        except:
+        except jwt.ExpiredSignatureError:
+            return jsonify({"message": "Token has expired"}), 400
+        except jwt.InvalidTokenError:
             return jsonify({"message": "Invalid token"}), 400
 
     elif request.method == "POST":
@@ -367,7 +393,9 @@ def reset():
                 )
 
             return jsonify({"message": "Invalid token"}), 400
-        except:
+        except jwt.ExpiredSignatureError:
+            return jsonify({"message": "Token has expired"}), 400
+        except jwt.InvalidTokenError:
             return jsonify({"message": "Invalid token"}), 400
 
 @app.route("/product/<int:id>", methods=["GET", "PATCH", "DELETE"])
@@ -377,16 +405,26 @@ def handle_product(id):
         return jsonify({"message": "Product not found"}), 404
 
     if request.method == "GET":
-        return jsonify(
-            {
-                "id": product.id,
-                "name": product.name,
-                "price": product.price,
-                "quantity": product.quantity,
-                "photo": product.photo,
-                "description": product.description,
-            }
-        )
+        product_data = {
+            "id": product.id,
+            "name": product.name,
+            "price": product.price,
+            "quantity": product.quantity,
+            "photo": product.photo,
+            "description": product.description,
+            "type": product.type.value,
+            "options": [
+                {
+                    "id": option.id,
+                    "name": option.name,
+                    "description": option.description,
+                    "type": option.type.value,
+                    "images": [image.url for image in option.images],
+                }
+                for option in product.options
+            ],
+        }
+        return jsonify(product_data), 200
 
     return modify_or_delete_product(product)
 
@@ -394,11 +432,58 @@ def handle_product(id):
 def modify_or_delete_product(user, product):
     if request.method == "PATCH":
         data = request.json
+
         product.name = data.get("name", product.name)
         product.price = data.get("price", product.price)
         product.quantity = data.get("quantity", product.quantity)
         product.photo = data.get("photo", product.photo)
         product.description = data.get("description", product.description)
+        product_type = data.get("type")
+        if product_type:
+            try:
+                product.type = Flower(product_type)
+            except ValueError:
+                return jsonify({"message": "Invalid product type"}), 400
+
+        # Handle options if provided
+        options_data = data.get("options")
+        if options_data:
+            for option in options_data:
+                option_id = option.get("id")
+                if option_id:
+                    # Update existing option
+                    existing_option = db.session.query(Option).filter_by(id=option_id, product_id=product.id).first()
+                    if existing_option:
+                        existing_option.name = option.get("name", existing_option.name)
+                        existing_option.description = option.get("description", existing_option.description)
+                        option_type = option.get("type")
+                        if option_type:
+                            try:
+                                existing_option.type = OptionType(option_type)
+                            except ValueError:
+                                return jsonify({"message": "Invalid option type"}), 400
+                        # Handle images
+                        images = option.get("images")
+                        if images:
+                            # Clear existing images and add new ones
+                            existing_option.images = []
+                            for img_url in images:
+                                existing_option.images.append(Image(url=img_url))
+                else:
+                    # Create new option
+                    new_option = Option(
+                        name=option["name"],
+                        description=option.get("description"),
+                        type=OptionType(option["type"]),
+                        product=product
+                    )
+                    images = option.get("images", [])
+                    for img_url in images:
+                        new_option.images.append(Image(url=img_url))
+                    db.session.add(new_option)
+
+        # Optionally handle deletion of options if needed
+
         db.session.commit()
         return jsonify({"status": "success", "message": "Product updated"}), 200
 
@@ -411,24 +496,29 @@ def modify_or_delete_product(user, product):
 def products():
     if request.method == "GET":
         products = Product.query.all()
-        return (
-            jsonify(
-                {
-                    "products": [
-                        {
-                            "id": p.id,
-                            "name": p.name,
-                            "price": p.price,
-                            "quantity": p.quantity,
-                            "photo": p.photo,
-                            "description": p.description,
-                        }
-                        for p in products
-                    ]
-                }
-            ),
-            200,
-        )
+        products_data = [
+            {
+                "id": p.id,
+                "name": p.name,
+                "price": p.price,
+                "quantity": p.quantity,
+                "photo": p.photo,
+                "description": p.description,
+                "type": p.type.value,
+                "options": [
+                    {
+                        "id": option.id,
+                        "name": option.name,
+                        "description": option.description,
+                        "type": option.type.value,
+                        "images": [image.url for image in option.images],
+                    }
+                    for option in p.options
+                ],
+            }
+            for p in products
+        ]
+        return jsonify({"products": products_data}), 200
 
     return create_product()
 
@@ -438,7 +528,7 @@ def create_product(current_user: User):
         return jsonify({"message": "Unauthorized"}), 403
 
     data = request.json
-    required = {"name", "price", "quantity", "flower", "description"}
+    required = {"name", "price", "quantity", "type", "description"}
     if not required.issubset(data):
         return (
             jsonify(
@@ -446,14 +536,45 @@ def create_product(current_user: User):
             ),
             400,
         )
+
+    # Validate product type
+    try:
+        product_type = Flower(data["type"])
+    except ValueError:
+        return jsonify({"message": "Invalid product type"}), 400
+
     product = Product(
         name=data["name"],
         price=data["price"],
         quantity=data["quantity"],
         photo=data.get("photo"),
         description=data["description"],
-        type=data["flower"],
+        type=product_type,
     )
+
+    # Handle options if provided
+    options_data = data.get("options", [])
+    for option in options_data:
+        option_name = option.get("name")
+        option_type = option.get("type")
+        if not option_name or not option_type:
+            return jsonify({"message": "Each option must have a name and type"}), 400
+        try:
+            option_enum = OptionType(option_type)
+        except ValueError:
+            return jsonify({"message": f"Invalid option type: {option_type}"}), 400
+
+        new_option = Option(
+            name=option_name,
+            description=option.get("description"),
+            type=option_enum,
+            product=product
+        )
+        images = option.get("images", [])
+        for img_url in images:
+            new_option.images.append(Image(url=img_url))
+        db.session.add(new_option)
+
     db.session.add(product)
     db.session.commit()
     return jsonify({"status": "success"}), 201
@@ -620,6 +741,10 @@ def modify_or_delete_cart_item(user, id):
 
     product = db.session.query(Product).filter_by(id=cart_item.product_id).first()
 
+    if not product:
+        return jsonify({"message": "Associated product not found"}), 404
+
+
     if request.method == "PATCH":
         data = request.json
         new_quantity = data.get("quantity")
@@ -656,11 +781,13 @@ def count_total_price(cart_items):
             new_item["price"] = product.price
             new_item["name"] = product.name
             new_item["description"] = product.description
-            new_item["images"] = [product.photo] if product.photo else []
-            total_price += new_item["quantity"] * product.price
+            new_item["images"] = [product.photo]  # You might want to include more images
+            total_price += item.quantity * product.price
             new_cart_items.append(new_item)
 
     return {"total_price": total_price, "products": new_cart_items}
+
+current_time = int(time.time())
 
 def create_payment_link(filtered, promocode) -> Session:
     line_items = []
@@ -677,7 +804,8 @@ def create_payment_link(filtered, promocode) -> Session:
                 "product_data": {
                     "name": product["name"],
                     "description": product["description"],
-                    "images": product["images"],
+                    # If you have multiple images, you can provide the first one or handle accordingly
+                    "images": [product["images"][0]] if product["images"] else [],
                 },
             },
             "quantity": product["quantity"],
@@ -688,7 +816,7 @@ def create_payment_link(filtered, promocode) -> Session:
         payment_method_types=["card"],
         line_items=line_items,
         mode="payment",
-        success_url=f"https://yourdomain.com/success",
+        success_url=f"https://yourdomain.com/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"https://yourdomain.com/cancel",
         client_reference_id=str(uuid.uuid4()),
         expires_at=int(time.time()) + 2000,

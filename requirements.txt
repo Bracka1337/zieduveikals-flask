@@ -20,3 +20,4 @@ wheel~=0.41.2
 importlib-metadata~=8.4.0
 flask-swagger-ui~=4.11.1
 stripe==10.10.0
+flask_mail==0.10.0
