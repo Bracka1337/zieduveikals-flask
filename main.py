@@ -787,7 +787,6 @@ def count_total_price(cart_items):
 
     return {"total_price": total_price, "products": new_cart_items}
 
-current_time = int(time.time())
 
 def create_payment_link(filtered, promocode) -> Session:
     line_items = []
@@ -804,7 +803,6 @@ def create_payment_link(filtered, promocode) -> Session:
                 "product_data": {
                     "name": product["name"],
                     "description": product["description"],
-                    # If you have multiple images, you can provide the first one or handle accordingly
                     "images": [product["images"][0]] if product["images"] else [],
                 },
             },
