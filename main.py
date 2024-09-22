@@ -17,8 +17,13 @@ from functools import wraps
 from flask_swagger_ui import get_swaggerui_blueprint
 from stripe.checkout import Session
 from flask_mail import Mail, Message
+import redis
+
 
 load_dotenv()
+
+redis_url = os.getenv("REDIS_URL")
+r = redis.from_url(redis_url)
 
 REFRESH_TOKEN_SECRET = os.getenv("REFRESH_TOKEN_SECRET")
 ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
@@ -43,7 +48,6 @@ migrate = Migrate(app, db)
 swagger_ui_blueprint = get_swaggerui_blueprint(
     "/swagger", "/static/swagger.json", config={"app_name": "ZieduVeikals"}
 )
-
 app.register_blueprint(swagger_ui_blueprint, url_prefix="/swagger")
 
 class Role(enum.Enum):
@@ -59,6 +63,7 @@ class Status(enum.Enum):
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
 
+
 class OptionType(enum.Enum):
     COLOR = "COLOR"
     SIZE = "SIZE"
@@ -70,11 +75,8 @@ class User(db.Model):
     username: Mapped[str] = mapped_column(unique=True)
     email: Mapped[str]
     password: Mapped[str]
-    refresh_token: Mapped[str] = mapped_column(nullable=True)
     role: Mapped[Role] = mapped_column(Enum(Role, native_enum=True), default=Role.USER)
-    promocode_id: Mapped[int] = mapped_column(
-        db.ForeignKey("promocode.id"), nullable=True
-    )
+    promocode_id: Mapped[int] = mapped_column(db.ForeignKey("promocode.id"), nullable=True)
     current_promocode = db.relationship("Promocode", backref="users")
 
 class Product(db.Model):
@@ -100,19 +102,14 @@ class Image(db.Model):
     url: Mapped[str]
     option_id: Mapped[int] = mapped_column(db.ForeignKey("option.id"))
 
+
 class Order(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(db.ForeignKey("user.id"))
-    status: Mapped[Status] = mapped_column(
-        Enum(Status, native_enum=True), default=Status.PENDING
-    )
-    created_at: Mapped[datetime.datetime] = mapped_column(
-        default=datetime.datetime.utcnow
-    )
+    status: Mapped[Status] = mapped_column(Enum(Status, native_enum=True), default=Status.PENDING)
+    created_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)
     order_id: Mapped[str] = mapped_column(unique=True)
-    promocode_id: Mapped[int] = mapped_column(
-        db.ForeignKey("promocode.id"), nullable=True
-    )
+    promocode_id: Mapped[int] = mapped_column(db.ForeignKey("promocode.id"), nullable=True)
     promocode = db.relationship("Promocode")
     user = db.relationship("User", backref="orders")
 
@@ -145,8 +142,8 @@ def role_required(role):
         def decorated_function(*args, **kwargs):
             token = request.headers.get("Authorization")
             if token:
-                token = token.split(" ")[1]
                 try:
+                    token = token.split(" ")[1]
                     decoded_token = jwt.decode(
                         token, ACCESS_TOKEN_SECRET, algorithms=["HS256"]
                     )
@@ -183,9 +180,7 @@ def register():
     if user:
         return jsonify({"message": "Username already exists"}), 400
 
-    hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode(
-        "utf-8"
-    )
+    hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
     db.session.add(
         User(username=username, email=email, password=hashed_password, role=Role.USER)
@@ -215,10 +210,7 @@ def login():
             algorithm="HS256",
         )
 
-        db.session.query(User).filter_by(username=username).update(
-            {"refresh_token": refresh_token}
-        )
-        db.session.commit()
+        r.setex(f"refresh_token:{username}", 3600, refresh_token)
 
         access_token = jwt.encode(
             {
@@ -246,40 +238,36 @@ def refresh():
             refresh_token, REFRESH_TOKEN_SECRET, algorithms=["HS256"]
         )
         username = decoded_token["sub"]
-        user = db.session.query(User).filter_by(username=username).first()
 
-        if user and user.refresh_token == refresh_token:
-            access_token = jwt.encode(
-                {
-                    "sub": username,
-                    "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=15),
-                },
-                ACCESS_TOKEN_SECRET,
-                algorithm="HS256",
-            )
+        redis_refresh_token = r.get(f"refresh_token:{username}")
+        if not redis_refresh_token or redis_refresh_token.decode('utf-8') != refresh_token:
+            return jsonify({"message": "Invalid or expired refresh token"}), 401
 
-            refresh_token = jwt.encode(
-                {
-                    "sub": username,
-                    "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
-                },
-                REFRESH_TOKEN_SECRET,
-                algorithm="HS256",
-            )
+        access_token = jwt.encode(
+            {
+                "sub": username,
+                "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=15),
+            },
+            ACCESS_TOKEN_SECRET,
+            algorithm="HS256",
+        )
 
-            db.session.query(User).filter_by(username=username).update(
-                {"refresh_token": refresh_token}
-            )
+        new_refresh_token = jwt.encode(
+            {
+                "sub": username,
+                "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
+            },
+            REFRESH_TOKEN_SECRET,
+            algorithm="HS256",
+        )
 
-            db.session.commit()
+        r.setex(f"refresh_token:{username}", 3600, new_refresh_token)
 
-            return jsonify(
-                {"access_token": access_token, "refresh_token": refresh_token}
-            )
-        else:
-            return jsonify({"message": "Invalid refresh token"}), 401
+        return jsonify(
+            {"access_token": access_token, "refresh_token": new_refresh_token}
+        )
     except jwt.ExpiredSignatureError:
-        return jsonify({"message": "Invalid refresh token"}), 401
+        return jsonify({"message": "Expired refresh token"}), 401
     except jwt.InvalidTokenError:
         return jsonify({"message": "Invalid refresh token"}), 401
 
@@ -335,10 +323,11 @@ def reset_password():
     )
 
     msg = Message(
-        "Password Reset Request",
+
+        "Password Reset",
         sender="from@example.com",
         recipients=[user.email],
-        body=f"Click the link below to reset your password:\n\nhttps://yourdomain.com/reset?token={refresh}",
+        body=f"Click the link to reset your password: {refresh}",
     )
 
     mail.send(msg)
@@ -351,7 +340,7 @@ def reset_password():
 @app.route("/reset", methods=["GET", "POST"])
 def reset():
     if request.method == "GET":
-        data = request.args  # Changed from request.json to request.args for GET
+        data = request.args 
         token = data.get("token")
 
         if not token:
@@ -755,11 +744,12 @@ def modify_or_delete_cart_item(user, id):
     if not product:
         return jsonify({"message": "Associated product not found"}), 404
 
+
     if request.method == "PATCH":
         data = request.json
         new_quantity = data.get("quantity")
 
-        if new_quantity is None or new_quantity < 1 or product.quantity < new_quantity:
+        if new_quantity is None or new_quantity < 1 or (product and product.quantity < new_quantity):
             return jsonify({"message": "Invalid quantity"}), 400
 
         cart_item.quantity = new_quantity
@@ -802,14 +792,15 @@ current_time = int(time.time())
 def create_payment_link(filtered, promocode) -> Session:
     line_items = []
     for product in filtered["products"]:
+        unit_amount = int(round(product["price"] * 100)) 
+        if promocode:
+            unit_amount = round(unit_amount * (1 - promocode.discount / 100))
+            unit_amount = int(unit_amount)
+
         line_item = {
             "price_data": {
                 "currency": "eur",
-                "unit_amount": (
-                    round(int(product["price"] * 100) * (1 - promocode.discount / 100))
-                    if promocode
-                    else int(round(product["price"] * 100))
-                ),
+                "unit_amount": unit_amount,
                 "product_data": {
                     "name": product["name"],
                     "description": product["description"],
@@ -828,7 +819,7 @@ def create_payment_link(filtered, promocode) -> Session:
         success_url=f"https://yourdomain.com/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"https://yourdomain.com/cancel",
         client_reference_id=str(uuid.uuid4()),
-        expires_at=current_time + 2000,
+        expires_at=int(time.time()) + 2000,
     )
     return checkout_session
 
@@ -955,7 +946,7 @@ def get_orders(user):
                 "email": order.user.email,
                 "role": order.user.role.value,
             },
-            "promocode": promocode_data,  # Add promocode data here
+            "promocode": promocode_data, 
             "items": [
                 {
                     "id": item.id,
@@ -1024,7 +1015,6 @@ def handle_promocode(user, id):
         return jsonify({"message": "Promocode not found"}), 404
 
     if request.method == "POST":
-
         if user.current_promocode:
             user.current_promocode.count_usage += 1
 
