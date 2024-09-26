@@ -1,8 +1,8 @@
-"""raaar
+"""cascade
 
-Revision ID: 8b20af5c4e69
+Revision ID: 1e0a7232968f
 Revises: 
-Create Date: 2024-09-19 12:37:52.830371
+Create Date: 2024-09-25 12:37:52.844667
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '8b20af5c4e69'
+revision = '1e0a7232968f'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -49,7 +49,6 @@ def upgrade():
     sa.Column('username', sa.String(), nullable=False),
     sa.Column('email', sa.String(), nullable=False),
     sa.Column('password', sa.String(), nullable=False),
-    sa.Column('refresh_token', sa.String(), nullable=True),
     sa.Column('role', sa.Enum('ADMIN', 'USER', name='role'), nullable=False),
     sa.Column('promocode_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['promocode_id'], ['promocode.id'], ),

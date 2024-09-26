@@ -8,7 +8,7 @@ import stripe
 import time
 import uuid
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column,backref
 from flask_migrate import Migrate
 from sqlalchemy import Enum
 import enum
@@ -75,52 +75,24 @@ class User(db.Model):
     username: Mapped[str] = mapped_column(unique=True)
     email: Mapped[str]
     password: Mapped[str]
-    role: Mapped[Role] = mapped_column(Enum(Role, native_enum=True), default=Role.USER)
-    promocode_id: Mapped[int] = mapped_column(db.ForeignKey("promocode.id"), nullable=True)
-    current_promocode = db.relationship("Promocode", backref="users")
-
-class Product(db.Model):
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str]
-    price: Mapped[float]
-    quantity: Mapped[int]
-    photo: Mapped[str] = mapped_column(nullable=True)
-    description: Mapped[str] = mapped_column(nullable=True)
-    type: Mapped[Flower] = mapped_column(Enum(Flower, native_enum=True))
-    options = db.relationship("Option", backref="product", cascade="all, delete-orphan")
-
-class Option(db.Model):
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str]
-    description: Mapped[str] = mapped_column(nullable=True)
-    type: Mapped[OptionType] = mapped_column(Enum(OptionType, native_enum=True))
-    product_id: Mapped[int] = mapped_column(db.ForeignKey("product.id"))
-    images = db.relationship("Image", backref="option", cascade="all, delete-orphan")
-
-class Image(db.Model):
-    id: Mapped[int] = mapped_column(primary_key=True)
-    url: Mapped[str]
-    option_id: Mapped[int] = mapped_column(db.ForeignKey("option.id"))
-
-
-class Order(db.Model):
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(db.ForeignKey("user.id"))
-    status: Mapped[Status] = mapped_column(Enum(Status, native_enum=True), default=Status.PENDING)
-    created_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)
-    order_id: Mapped[str] = mapped_column(unique=True)
-    promocode_id: Mapped[int] = mapped_column(db.ForeignKey("promocode.id"), nullable=True)
-    promocode = db.relationship("Promocode")
-    user = db.relationship("User", backref="orders")
-
-class OrderItem(db.Model):
-    id: Mapped[int] = mapped_column(primary_key=True)
-    order_id: Mapped[int] = mapped_column(db.ForeignKey("order.id"))
-    product_id: Mapped[int] = mapped_column(db.ForeignKey("product.id"))
-    quantity: Mapped[int]
-    price: Mapped[float]
-    order = db.relationship("Order", backref="items")
-    product = db.relationship("Product")
+    role: Mapped[Role] = mapped_column(
+        Enum(Role, native_enum=True), default=Role.USER
+    )
+    promocode_id: Mapped[int] = mapped_column(
+        db.ForeignKey("promocode.id", ondelete='SET NULL'), nullable=True
+    )
+    current_promocode = db.relationship(
+        "Promocode",
+        backref=backref("users_with_current_promocode", passive_deletes=True)
+    )
+    orders = db.relationship(
+        "Order",
+        backref=backref("user", passive_deletes=True), cascade="all, delete-orphan"
+    )
+    cart_items = db.relationship(
+        "CartItem",
+        backref=backref("user", passive_deletes=True), cascade="all, delete-orphan"
+    )
 
 class Promocode(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -128,13 +100,74 @@ class Promocode(db.Model):
     discount: Mapped[float]
     count_usage: Mapped[int]
 
+class Order(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        db.ForeignKey("user.id", ondelete='CASCADE')
+    )
+    status: Mapped[Status] = mapped_column(
+        Enum(Status, native_enum=True), default=Status.PENDING
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        default=datetime.datetime.utcnow
+    )
+    order_id: Mapped[str] = mapped_column(unique=True)
+    promocode_id: Mapped[int] = mapped_column(
+        db.ForeignKey("promocode.id", ondelete='SET NULL'), nullable=True
+    )
+    promocode = db.relationship(
+        "Promocode",
+        backref=backref("orders", passive_deletes=True)
+    )
+    items = db.relationship(
+        "OrderItem",
+        backref=backref("order", passive_deletes=True), cascade="all, delete-orphan"
+    )
+    # 'user' relationship is created via backref from 'User.orders'
+
+# ... [rest of your models with similar adjustments]
+
+class Product(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    price: Mapped[float]
+    quantity: Mapped[int]
+    type: Mapped[Flower] = mapped_column(Enum(Flower, native_enum=True))
+    options = db.relationship("Option", backref=backref("product", passive_deletes=True), cascade="all, delete-orphan")
+    order_items = db.relationship("OrderItem", backref=backref("product", passive_deletes=True), cascade=None)
+    cart_items = db.relationship("CartItem", backref=backref("product", passive_deletes=True), cascade="all, delete-orphan")
+
+class Option(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    description: Mapped[str] = mapped_column(nullable=True)
+    type: Mapped[OptionType] = mapped_column(Enum(OptionType, native_enum=True))
+    product_id: Mapped[int] = mapped_column(db.ForeignKey("product.id", ondelete='CASCADE'))
+    images = db.relationship("Image", backref=backref("option", passive_deletes=True), cascade="all, delete-orphan")
+
+class Image(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    url: Mapped[str]
+    option_id: Mapped[int] = mapped_column(db.ForeignKey("option.id", ondelete='CASCADE'))
+
+class OrderItem(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(db.ForeignKey("order.id", ondelete='CASCADE'))
+    product_id: Mapped[int] = mapped_column(db.ForeignKey("product.id", ondelete='SET NULL'), nullable=True)
+    quantity: Mapped[int]
+    price: Mapped[float]
+    
+    product_name: Mapped[str]  # Store product name in OrderItem
+    product_description: Mapped[str] = mapped_column(nullable=True)  # Store product description
+    product_photo: Mapped[str] = mapped_column(nullable=True)  # Store product photo
+
+
+
 class CartItem(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(db.ForeignKey("user.id"))
-    product_id: Mapped[int] = mapped_column(db.ForeignKey("product.id"))
+    user_id: Mapped[int] = mapped_column(db.ForeignKey("user.id", ondelete='CASCADE'))
+    product_id: Mapped[int] = mapped_column(db.ForeignKey("product.id", ondelete='CASCADE'))
     quantity: Mapped[int]
-    user = db.relationship("User", backref="cart_items")
-    product = db.relationship("Product")
 
 def role_required(role):
     def decorator(f):
@@ -502,8 +535,6 @@ def products():
                 "name": p.name,
                 "price": p.price,
                 "quantity": p.quantity,
-                "photo": p.photo,
-                "description": p.description,
                 "type": p.type.value,
                 "options": [
                     {
@@ -528,11 +559,11 @@ def create_product(current_user: User):
         return jsonify({"message": "Unauthorized"}), 403
 
     data = request.json
-    required = {"name", "price", "quantity", "type", "description"}
+    required = {"name", "price", "quantity", "type"}
     if not required.issubset(data):
         return (
             jsonify(
-                {"message": "Name, price, quantity, description, and type are required"}
+                {"message": "Name, price, quantity, and type are required"}
             ),
             400,
         )
@@ -547,8 +578,6 @@ def create_product(current_user: User):
         name=data["name"],
         price=data["price"],
         quantity=data["quantity"],
-        photo=data.get("photo"),
-        description=data["description"],
         type=product_type,
     )
 
@@ -620,7 +649,6 @@ def filter_products(products):
             if db_product.quantity < product["quantity"]:
                 product["quantity"] = db_product.quantity
                 product["name"] = db_product.name
-                product["description"] = db_product.description
             if db_product.quantity == 0 or product["quantity"] == 0:
                 products.remove(product)
             else:
@@ -780,8 +808,6 @@ def count_total_price(cart_items):
             new_item["quantity"] = min(item.quantity, product.quantity)
             new_item["price"] = product.price
             new_item["name"] = product.name
-            new_item["description"] = product.description
-            new_item["images"] = [product.photo]  # You might want to include more images
             total_price += item.quantity * product.price
             new_cart_items.append(new_item)
 
@@ -802,8 +828,8 @@ def create_payment_link(filtered, promocode) -> Session:
                 "unit_amount": unit_amount,
                 "product_data": {
                     "name": product["name"],
-                    "description": product["description"],
-                    "images": [product["images"][0]] if product["images"] else [],
+                    # "description": product["description"],
+                    # "images": [product["images"][0]] if product["images"] else [],
                 },
             },
             "quantity": product["quantity"],
@@ -856,20 +882,23 @@ def buy(user):
     db.session.commit()
 
     for product in filtered["products"]:
-        db_product = (
-            db.session.query(Product).filter_by(id=product["product_id"]).first()
-        )
+        db_product = db.session.query(Product).filter_by(id=product["product_id"]).first()
+        print(db_product)
         if db_product:
             db_product.quantity -= product["quantity"]
-            db.session.commit()
             db.session.add(
                 OrderItem(
                     order_id=new_order.id,
                     product_id=product["product_id"],
                     quantity=product["quantity"],
                     price=db_product.price,
+                    product_name=db_product.name,  # Save product name
+                    #product_description=db_product.description,  # Save product description
+                    #product_photo=db_product.photo  # Save product photo
                 )
             )
+
+
     db.session.commit()
 
     return jsonify({"payment_link": res.url}), 201
@@ -945,11 +974,13 @@ def get_orders(user):
                 "role": order.user.role.value,
             },
             "promocode": promocode_data, 
-            "items": [
+           "items": [
                 {
                     "id": item.id,
-                    "product_id": item.product_id,
-                    "product_name": item.product.name,
+                    "product_id": item.product_id,  
+                    "product_name": item.product_name, 
+                    "product_description": item.product_description, 
+                    "product_photo": item.product_photo,  
                     "quantity": item.quantity,
                     "price": item.price,
                 }
