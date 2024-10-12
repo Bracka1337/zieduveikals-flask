@@ -300,38 +300,6 @@
         }
       }
     },
-    "/webhook": {
-      "post": {
-        "tags": ["Payment"],
-        "summary": "Stripe webhook",
-        "description": "Handles Stripe webhook events related to payment status.",
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "description": "Stripe webhook event data",
-            "required": true,
-            "schema": {
-              "type": "object"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Webhook received successfully",
-            "schema": {
-              "$ref": "#/definitions/SuccessResponse"
-            }
-          },
-          "400": {
-            "description": "Invalid webhook data or unhandled event type",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
-          }
-        }
-      }
-    },
     "/products": {
       "get": {
         "tags": ["Products"],
