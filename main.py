@@ -133,6 +133,7 @@ class Product(db.Model):
     price: Mapped[float]
     quantity: Mapped[int]
     short_description: Mapped[str]
+    discount: Mapped[int] = mapped_column(nullable=True)
     type: Mapped[Flower] = mapped_column(Enum(Flower, native_enum=True))
     options = db.relationship("Option", backref=backref("product", passive_deletes=True), cascade="all, delete-orphan")
     order_items = db.relationship("OrderItem", backref=backref("product", passive_deletes=True), cascade=None)
@@ -445,6 +446,7 @@ def handle_product(id):
             "price": product.price,
             "quantity": product.quantity,
             "short_description": product.short_description,
+            "discount": product.discount,
             "photo": product.photo,
             "description": product.description,
             "type": product.type.value,
@@ -471,9 +473,8 @@ def modify_or_delete_product(user, product):
         product.name = data.get("name", product.name)
         product.price = data.get("price", product.price)
         product.quantity = data.get("quantity", product.quantity)
-        product.photo = data.get("photo", product.photo)
-        product.description = data.get("description", product.description)
         product.short_description = data.get("short_description", product.short_description)
+        product.discount = data.get("discount", product.discount)
         product_type = data.get("type")
         if product_type:
             try:
@@ -539,6 +540,7 @@ def products():
                 "price": p.price,
                 "quantity": p.quantity,
                 "short_description": p.short_description,
+                "discount": p.discount,
                 "type": p.type.value,
                 "options": [
                     {
@@ -657,7 +659,7 @@ def filter_products(products):
             if db_product.quantity == 0 or product["quantity"] == 0:
                 products.remove(product)
             else:
-                total_price += product["quantity"] * db_product.price
+                total_price += product["quantity"] * db_product.price * (1 - db_product.discount / 100)
         else:
             products.remove(product)
 
@@ -729,8 +731,8 @@ def view_cart(user):
                     "product_id": product.id,
                     "name": product.name,
                     "price": product.price,
-                    "photo": product.photo,
                     "quantity": item.quantity,
+                    "discount": product.discount,
                     "short_description": product.short_description,
                     "actual_quantity": product.quantity,
                     "message": (
@@ -814,7 +816,8 @@ def count_total_price(cart_items):
             new_item["quantity"] = min(item.quantity, product.quantity)
             new_item["price"] = product.price
             new_item["name"] = product.name
-            total_price += item.quantity * product.price
+            new_item["discount"] = product.discount
+            total_price += item.quantity * product.price * (1-product.discount/100)
             new_cart_items.append(new_item)
 
     return {"total_price": total_price, "products": new_cart_items}
@@ -824,9 +827,12 @@ def create_payment_link(filtered, promocode) -> Session:
     line_items = []
     for product in filtered["products"]:
         unit_amount = int(round(product["price"] * 100)) 
+        if product["discount"]:
+            unit_amount = round(unit_amount * (1 - product["discount"] / 100))
         if promocode:
             unit_amount = round(unit_amount * (1 - promocode.discount / 100))
             unit_amount = int(unit_amount)
+        
 
         line_item = {
             "price_data": {
