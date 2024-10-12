@@ -1,8 +1,8 @@
-"""cascade
+"""db
 
-Revision ID: 1e0a7232968f
+Revision ID: 4cfb4dea4438
 Revises: 
-Create Date: 2024-09-25 12:37:52.844667
+Create Date: 2024-10-12 10:20:47.622043
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '1e0a7232968f'
+revision = '4cfb4dea4438'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -23,8 +23,7 @@ def upgrade():
     sa.Column('name', sa.String(), nullable=False),
     sa.Column('price', sa.Float(), nullable=False),
     sa.Column('quantity', sa.Integer(), nullable=False),
-    sa.Column('photo', sa.String(), nullable=True),
-    sa.Column('description', sa.String(), nullable=True),
+    sa.Column('short_description', sa.String(), nullable=False),
     sa.Column('type', sa.Enum('FLOWER', 'BOUQUET', name='flower'), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
@@ -41,7 +40,7 @@ def upgrade():
     sa.Column('description', sa.String(), nullable=True),
     sa.Column('type', sa.Enum('COLOR', 'SIZE', 'MATERIAL', 'OTHER', name='optiontype'), nullable=False),
     sa.Column('product_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['product_id'], ['product.id'], ),
+    sa.ForeignKeyConstraint(['product_id'], ['product.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user',
@@ -51,7 +50,7 @@ def upgrade():
     sa.Column('password', sa.String(), nullable=False),
     sa.Column('role', sa.Enum('ADMIN', 'USER', name='role'), nullable=False),
     sa.Column('promocode_id', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['promocode_id'], ['promocode.id'], ),
+    sa.ForeignKeyConstraint(['promocode_id'], ['promocode.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('username')
     )
@@ -60,15 +59,15 @@ def upgrade():
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('product_id', sa.Integer(), nullable=False),
     sa.Column('quantity', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['product_id'], ['product.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
+    sa.ForeignKeyConstraint(['product_id'], ['product.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('image',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('url', sa.String(), nullable=False),
     sa.Column('option_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['option_id'], ['option.id'], ),
+    sa.ForeignKeyConstraint(['option_id'], ['option.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('order',
@@ -78,19 +77,22 @@ def upgrade():
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('order_id', sa.String(), nullable=False),
     sa.Column('promocode_id', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['promocode_id'], ['promocode.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
+    sa.ForeignKeyConstraint(['promocode_id'], ['promocode.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('order_id')
     )
     op.create_table('order_item',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('order_id', sa.Integer(), nullable=False),
-    sa.Column('product_id', sa.Integer(), nullable=False),
+    sa.Column('product_id', sa.Integer(), nullable=True),
     sa.Column('quantity', sa.Integer(), nullable=False),
     sa.Column('price', sa.Float(), nullable=False),
-    sa.ForeignKeyConstraint(['order_id'], ['order.id'], ),
-    sa.ForeignKeyConstraint(['product_id'], ['product.id'], ),
+    sa.Column('product_name', sa.String(), nullable=False),
+    sa.Column('product_description', sa.String(), nullable=True),
+    sa.Column('product_photo', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['order_id'], ['order.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['product_id'], ['product.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###
