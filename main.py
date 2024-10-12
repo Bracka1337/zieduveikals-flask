@@ -158,9 +158,9 @@ class OrderItem(db.Model):
     quantity: Mapped[int]
     price: Mapped[float]
     
-    product_name: Mapped[str]  # Store product name in OrderItem
-    product_description: Mapped[str] = mapped_column(nullable=True)  # Store product description
-    product_photo: Mapped[str] = mapped_column(nullable=True)  # Store product photo
+    product_name: Mapped[str] 
+    product_description: Mapped[str] = mapped_column(nullable=True) 
+    product_photo: Mapped[str] = mapped_column(nullable=True) 
 
 
 
