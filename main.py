@@ -65,6 +65,7 @@ class Status(enum.Enum):
 
 
 class OptionType(enum.Enum):
+    DEFAULT = "DEFAULT"
     COLOR = "COLOR"
     SIZE = "SIZE"
     MATERIAL = "MATERIAL"
@@ -123,9 +124,6 @@ class Order(db.Model):
         "OrderItem",
         backref=backref("order", passive_deletes=True), cascade="all, delete-orphan"
     )
-    # 'user' relationship is created via backref from 'User.orders'
-
-# ... [rest of your models with similar adjustments]
 
 class Product(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -134,6 +132,7 @@ class Product(db.Model):
     quantity: Mapped[int]
     short_description: Mapped[str]
     discount: Mapped[int] = mapped_column(nullable=True)
+    is_featured: Mapped[bool] = mapped_column(default=False, nullable=True)
     type: Mapped[Flower] = mapped_column(Enum(Flower, native_enum=True))
     options = db.relationship("Option", backref=backref("product", passive_deletes=True), cascade="all, delete-orphan")
     order_items = db.relationship("OrderItem", backref=backref("product", passive_deletes=True), cascade=None)
@@ -475,6 +474,7 @@ def modify_or_delete_product(user, product):
         product.quantity = data.get("quantity", product.quantity)
         product.short_description = data.get("short_description", product.short_description)
         product.discount = data.get("discount", product.discount)
+        product.is_featured = data.get("is_featured", product.is_featured)
         product_type = data.get("type")
         if product_type:
             try:
@@ -542,6 +542,7 @@ def products():
                 "short_description": p.short_description,
                 "discount": p.discount,
                 "type": p.type.value,
+                "is_featured": p.is_featured,
                 "options": [
                     {
                         "id": option.id,
@@ -558,6 +559,7 @@ def products():
         return jsonify({"products": products_data}), 200
 
     return create_product()
+
 
 @role_required(Role.ADMIN)
 def create_product(current_user: User):
@@ -614,6 +616,37 @@ def create_product(current_user: User):
     db.session.add(product)
     db.session.commit()
     return jsonify({"status": "success"}), 201
+
+
+
+@app.route("/featured_products", methods=["GET"])
+def featured_products():
+    products = db.session.query(Product).filter_by(is_featured=True).all()
+    products_data = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "price": p.price,
+            "quantity": p.quantity,
+            "short_description": p.short_description,
+            "discount": p.discount,
+            "type": p.type.value,
+            "options": [
+                {
+                    "id": option.id,
+                    "name": option.name,
+                    "description": option.description,
+                    "type": option.type.value,
+                    "images": [image.url for image in option.images],
+                }
+                for option in p.options
+            ],
+        }
+        for p in products
+    ]
+    return jsonify({"products": products_data}), 200
+
+
 
 @app.route("/get_users", methods=["GET"])
 @role_required(Role.ADMIN)

@@ -3,7 +3,17 @@
   "info": {
     "description": "API documentation for ZieduVeikals.",
     "version": "1.1.0",
-    "title": "ZieduVeikals API"
+    "title": "ZieduVeikals API",
+    "termsOfService": "https://zieduveikals.com/terms",
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    },
+    "contact": {
+      "name": "Support Team",
+      "url": "https://zieduveikals.com/support",
+      "email": "support@zieduveikals.com"
+    }
   },
   "tags": [
     {
@@ -37,9 +47,15 @@
     {
       "name": "Payment",
       "description": "Payment related endpoints"
+    },
+    {
+      "name": "Featured Products",
+      "description": "Featured products operations"
     }
   ],
-  "schemes": ["http"],
+  "schemes": ["https", "http"],
+  "host": "api.zieduveikals.com",
+  "basePath": "/",
   "paths": {
     "/register": {
       "post": {
@@ -59,10 +75,16 @@
         ],
         "responses": {
           "201": {
-            "description": "User created successfully"
+            "description": "User created successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
           "400": {
-            "description": "Username already exists or missing fields"
+            "description": "Username already exists or missing fields",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
@@ -90,8 +112,17 @@
               "$ref": "#/definitions/AuthTokens"
             }
           },
+          "400": {
+            "description": "Username and password are required",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
           "401": {
-            "description": "Invalid credentials"
+            "description": "Invalid credentials",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
@@ -114,13 +145,22 @@
         ],
         "responses": {
           "200": {
-            "description": "New access token generated",
+            "description": "New access and refresh tokens generated",
             "schema": {
               "$ref": "#/definitions/AuthTokens"
             }
           },
+          "400": {
+            "description": "Refresh token is required",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
           "401": {
-            "description": "Invalid or expired refresh token"
+            "description": "Invalid or expired refresh token",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
@@ -130,14 +170,12 @@
         "tags": ["Authentication"],
         "summary": "Change user password",
         "description": "Allows an authenticated user to change their password.",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for authentication"
-          },
+            "Bearer": []
+          }
+        ],
+        "parameters": [
           {
             "name": "body",
             "in": "body",
@@ -150,13 +188,22 @@
         ],
         "responses": {
           "200": {
-            "description": "Password changed successfully"
+            "description": "Password changed successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
           "400": {
-            "description": "Invalid input data"
+            "description": "Invalid input data or old password",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
@@ -179,10 +226,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Password reset link sent to email"
+            "description": "Password reset link sent to email",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
           "400": {
-            "description": "Email is required or not found"
+            "description": "Email is required or not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
@@ -194,21 +247,25 @@
         "description": "Verifies the validity of the password reset token.",
         "parameters": [
           {
-            "name": "body",
-            "in": "body",
+            "name": "token",
+            "in": "query",
             "description": "Password reset token",
             "required": true,
-            "schema": {
-              "$ref": "#/definitions/ResetToken"
-            }
+            "type": "string"
           }
         ],
         "responses": {
           "200": {
-            "description": "Token is valid"
+            "description": "Token is valid",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
           "400": {
-            "description": "Invalid or missing token"
+            "description": "Invalid or missing token",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       },
@@ -229,10 +286,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Password reset successfully"
+            "description": "Password reset successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
           "400": {
-            "description": "Invalid input data or token"
+            "description": "Invalid input data or token",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
@@ -255,10 +318,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Webhook received successfully"
+            "description": "Webhook received successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
           "400": {
-            "description": "Invalid webhook data"
+            "description": "Invalid webhook data or unhandled event type",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
@@ -268,6 +337,24 @@
         "tags": ["Products"],
         "summary": "Get all products",
         "description": "Fetch all products in the inventory.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number to retrieve.",
+            "required": false,
+            "type": "integer",
+            "default": 1
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of items per page.",
+            "required": false,
+            "type": "integer",
+            "default": 20
+          }
+        ],
         "responses": {
           "200": {
             "description": "List of all products",
@@ -281,14 +368,12 @@
         "tags": ["Products"],
         "summary": "Create a new product",
         "description": "Adds a new product to the inventory. Admin only.",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for admin authentication"
-          },
+            "Bearer": []
+          }
+        ],
+        "parameters": [
           {
             "name": "body",
             "in": "body",
@@ -301,13 +386,37 @@
         ],
         "responses": {
           "201": {
-            "description": "Product created successfully"
+            "description": "Product created successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
           "400": {
-            "description": "Missing fields or invalid data"
+            "description": "Missing fields or invalid data",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "401": {
-            "description": "Admin authorization required"
+            "description": "Admin authorization required",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/featured_products": {
+      "get": {
+        "tags": ["Featured Products"],
+        "summary": "Get featured products",
+        "description": "Fetch all featured products in the inventory.",
+        "responses": {
+          "200": {
+            "description": "List of featured products",
+            "schema": {
+              "$ref": "#/definitions/ProductList"
+            }
           }
         }
       }
@@ -330,11 +439,14 @@
           "200": {
             "description": "Product details",
             "schema": {
-              "$ref": "#/definitions/Product"
+              "$ref": "#/definitions/ProductDetailed"
             }
           },
           "404": {
-            "description": "Product not found"
+            "description": "Product not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       },
@@ -342,14 +454,12 @@
         "tags": ["Products"],
         "summary": "Update product details",
         "description": "Modify an existing product. Admin only.",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for admin authentication"
-          },
+            "Bearer": []
+          }
+        ],
+        "parameters": [
           {
             "name": "id",
             "in": "path",
@@ -369,16 +479,28 @@
         ],
         "responses": {
           "200": {
-            "description": "Product updated successfully"
+            "description": "Product updated successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
           "400": {
-            "description": "Invalid input data"
+            "description": "Invalid input data",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "401": {
-            "description": "Admin authorization required"
+            "description": "Admin authorization required",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "404": {
-            "description": "Product not found"
+            "description": "Product not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       },
@@ -386,14 +508,12 @@
         "tags": ["Products"],
         "summary": "Delete a product",
         "description": "Removes a product from the inventory. Admin only.",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for admin authentication"
-          },
+            "Bearer": []
+          }
+        ],
+        "parameters": [
           {
             "name": "id",
             "in": "path",
@@ -404,13 +524,22 @@
         ],
         "responses": {
           "200": {
-            "description": "Product deleted successfully"
+            "description": "Product deleted successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
           "401": {
-            "description": "Admin authorization required"
+            "description": "Admin authorization required",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "404": {
-            "description": "Product not found"
+            "description": "Product not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
@@ -420,15 +549,12 @@
         "tags": ["Users"],
         "summary": "Get all users",
         "description": "Fetch all users. Admin only.",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for admin authentication"
+            "Bearer": []
           }
         ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "List of all users",
@@ -437,40 +563,10 @@
             }
           },
           "401": {
-            "description": "Admin authorization required"
-          }
-        }
-      }
-    },
-    "/buy": {
-      "post": {
-        "tags": ["Payment"],
-        "summary": "Buy products",
-        "description": "Processes a purchase of products from the cart.",
-        "parameters": [
-          {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for authentication"
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "Purchase processed successfully",
+            "description": "Admin authorization required",
             "schema": {
-              "$ref": "#/definitions/PurchaseResponse"
+              "$ref": "#/definitions/ErrorResponse"
             }
-          },
-          "400": {
-            "description": "Pending order exists or other bad request"
-          },
-          "401": {
-            "description": "Unauthorized - Invalid or missing token"
-          },
-          "404": {
-            "description": "No products found or product quantity is zero"
           }
         }
       }
@@ -480,14 +576,12 @@
         "tags": ["Cart"],
         "summary": "Add products to cart",
         "description": "Adds products to the user's cart.",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for authentication"
-          },
+            "Bearer": []
+          }
+        ],
+        "parameters": [
           {
             "name": "body",
             "in": "body",
@@ -506,13 +600,22 @@
             }
           },
           "400": {
-            "description": "No products provided"
+            "description": "No products provided or invalid data",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "404": {
-            "description": "No products found or quantity is zero"
+            "description": "No products found or quantity is zero",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
@@ -522,15 +625,12 @@
         "tags": ["Cart"],
         "summary": "View cart",
         "description": "Returns the user's cart items.",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for authentication"
+            "Bearer": []
           }
         ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "Cart details returned successfully",
@@ -539,7 +639,10 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       },
@@ -547,22 +650,24 @@
         "tags": ["Cart"],
         "summary": "Clear cart",
         "description": "Clears the user's cart.",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for authentication"
+            "Bearer": []
           }
         ],
+        "parameters": [],
         "responses": {
           "200": {
-            "description": "Cart cleared successfully"
+            "description": "Cart cleared successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
-      
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
@@ -572,14 +677,12 @@
         "tags": ["Cart"],
         "summary": "Modify cart item",
         "description": "Updates the quantity of a cart item.",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for authentication"
-          },
+            "Bearer": []
+          }
+        ],
+        "parameters": [
           {
             "name": "id",
             "in": "path",
@@ -599,16 +702,28 @@
         ],
         "responses": {
           "200": {
-            "description": "Cart item quantity updated successfully"
+            "description": "Cart item quantity updated successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
           "400": {
-            "description": "Invalid quantity"
+            "description": "Invalid quantity",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "404": {
-            "description": "Cart item not found"
+            "description": "Cart item not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       },
@@ -616,14 +731,12 @@
         "tags": ["Cart"],
         "summary": "Delete cart item",
         "description": "Removes an item from the user's cart.",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for authentication"
-          },
+            "Bearer": []
+          }
+        ],
+        "parameters": [
           {
             "name": "id",
             "in": "path",
@@ -634,13 +747,93 @@
         ],
         "responses": {
           "200": {
-            "description": "Cart item deleted successfully"
+            "description": "Cart item deleted successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
           "404": {
-            "description": "Cart item not found"
+            "description": "Cart item not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/buy": {
+      "post": {
+        "tags": ["Payment"],
+        "summary": "Buy products",
+        "description": "Processes a purchase of products from the cart.",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Purchase processed successfully",
+            "schema": {
+              "$ref": "#/definitions/PurchaseResponse"
+            }
+          },
+          "400": {
+            "description": "Pending order exists or other bad request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing token",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "No products found or product quantity is zero",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/webhook": {
+      "post": {
+        "tags": ["Payment"],
+        "summary": "Stripe webhook",
+        "description": "Handles Stripe webhook events related to payment status.",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Stripe webhook event data",
+            "required": true,
+            "schema": {
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook received successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid webhook data or unhandled event type",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
@@ -650,15 +843,12 @@
         "tags": ["Orders"],
         "summary": "Get all orders",
         "description": "Returns a list of orders. Admin users get all orders, while regular users get only their own orders.",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for authentication"
+            "Bearer": []
           }
         ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "List of orders",
@@ -667,7 +857,10 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
@@ -677,15 +870,12 @@
         "tags": ["Promocodes"],
         "summary": "Get all promocodes",
         "description": "Admin can retrieve all available promocodes.",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for admin authentication"
+            "Bearer": []
           }
         ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "List of promocodes",
@@ -694,7 +884,10 @@
             }
           },
           "401": {
-            "description": "Admin authorization required"
+            "description": "Admin authorization required",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       },
@@ -702,14 +895,12 @@
         "tags": ["Promocodes"],
         "summary": "Create a new promocode",
         "description": "Admin can create a new promocode.",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for admin authentication"
-          },
+            "Bearer": []
+          }
+        ],
+        "parameters": [
           {
             "name": "body",
             "in": "body",
@@ -722,32 +913,39 @@
         ],
         "responses": {
           "201": {
-            "description": "Promocode created successfully"
+            "description": "Promocode created successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
           "400": {
-            "description": "Invalid data or promocode already exists"
+            "description": "Invalid data or promocode already exists",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "401": {
-            "description": "Admin authorization required"
+            "description": "Admin authorization required",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
     },
-    "/promocode/{id}": {
+    "/promocode/{code}": {
       "post": {
         "tags": ["Promocodes"],
         "summary": "Apply promocode",
         "description": "Allows a user to apply a promocode to their account.",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
         "parameters": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for authentication"
-          },
-          {
-            "name": "id",
+            "name": "code",
             "in": "path",
             "required": true,
             "type": "string",
@@ -756,13 +954,22 @@
         ],
         "responses": {
           "200": {
-            "description": "Promocode applied successfully"
+            "description": "Promocode applied successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
           "404": {
-            "description": "Promocode not found"
+            "description": "Promocode not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       },
@@ -770,16 +977,14 @@
         "tags": ["Promocodes"],
         "summary": "Update promocode",
         "description": "Admin can update the details of an existing promocode.",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
         "parameters": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for admin authentication"
-          },
-          {
-            "name": "id",
+            "name": "code",
             "in": "path",
             "required": true,
             "type": "string",
@@ -797,13 +1002,28 @@
         ],
         "responses": {
           "200": {
-            "description": "Promocode updated successfully"
+            "description": "Promocode updated successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid data",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "404": {
-            "description": "Promocode not found"
+            "description": "Promocode not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "401": {
-            "description": "Admin authorization required"
+            "description": "Admin authorization required",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       },
@@ -811,16 +1031,14 @@
         "tags": ["Promocodes"],
         "summary": "Delete promocode",
         "description": "Admin can delete a promocode by its code.",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
         "parameters": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "required": true,
-            "type": "string",
-            "description": "Bearer token for admin authentication"
-          },
-          {
-            "name": "id",
+            "name": "code",
             "in": "path",
             "required": true,
             "type": "string",
@@ -829,13 +1047,22 @@
         ],
         "responses": {
           "200": {
-            "description": "Promocode deleted successfully"
+            "description": "Promocode deleted successfully",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
           },
           "404": {
-            "description": "Promocode not found"
+            "description": "Promocode not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           },
           "401": {
-            "description": "Admin authorization required"
+            "description": "Admin authorization required",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
@@ -844,260 +1071,822 @@
   "definitions": {
     "RegisterUser": {
       "type": "object",
+      "description": "Data required to register a new user.",
       "properties": {
-        "username": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "password": { "type": "string", "format": "password" }
+        "username": {
+          "type": "string",
+          "description": "Unique username for the user.",
+          "example": "john_doe"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User's email address.",
+          "example": "john@example.com"
+        },
+        "password": {
+          "type": "string",
+          "format": "password",
+          "description": "User's password.",
+          "example": "SecureP@ssw0rd!"
+        }
       },
       "required": ["username", "email", "password"]
     },
     "LoginUser": {
       "type": "object",
+      "description": "Data required to log in a user.",
       "properties": {
-        "username": { "type": "string" },
-        "password": { "type": "string", "format": "password" }
+        "username": {
+          "type": "string",
+          "description": "Username of the user.",
+          "example": "john_doe"
+        },
+        "password": {
+          "type": "string",
+          "format": "password",
+          "description": "Password of the user.",
+          "example": "SecureP@ssw0rd!"
+        }
       },
       "required": ["username", "password"]
     },
     "AuthTokens": {
       "type": "object",
+      "description": "Authentication tokens returned upon successful login or refresh.",
       "properties": {
-        "access_token": { "type": "string" },
-        "refresh_token": { "type": "string" }
-      }
+        "access_token": {
+          "type": "string",
+          "description": "JWT access token for authenticating requests.",
+          "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        },
+        "refresh_token": {
+          "type": "string",
+          "description": "JWT refresh token for obtaining new access tokens.",
+          "example": "dGhpc0lzQVNlY3JldFJlZnJlc2hUb2tlbg..."
+        }
+      },
+      "required": ["access_token", "refresh_token"]
     },
     "RefreshToken": {
       "type": "object",
+      "description": "Refresh token required to obtain new access tokens.",
       "properties": {
-        "refresh_token": { "type": "string" }
+        "refresh_token": {
+          "type": "string",
+          "description": "JWT refresh token.",
+          "example": "dGhpc0lzQVNlY3JldFJlZnJlc2hUb2tlbg..."
+        }
       },
       "required": ["refresh_token"]
     },
     "ChangePassword": {
       "type": "object",
+      "description": "Data required to change the user's password.",
       "properties": {
-        "old_password": { "type": "string", "format": "password" },
-        "new_password": { "type": "string", "format": "password" }
+        "old_password": {
+          "type": "string",
+          "format": "password",
+          "description": "User's current password.",
+          "example": "OldP@ssw0rd!"
+        },
+        "new_password": {
+          "type": "string",
+          "format": "password",
+          "description": "User's new password.",
+          "example": "NewSecureP@ssw0rd!"
+        }
       },
       "required": ["old_password", "new_password"]
     },
     "ResetPasswordRequest": {
       "type": "object",
+      "description": "Data required to initiate a password reset.",
       "properties": {
-        "email": { "type": "string", "format": "email" }
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User's email address.",
+          "example": "john@example.com"
+        }
       },
       "required": ["email"]
     },
     "ResetPassword": {
       "type": "object",
+      "description": "Data required to reset the user's password using a token.",
       "properties": {
-        "password": { "type": "string", "format": "password" },
-        "token": { "type": "string" }
+        "password": {
+          "type": "string",
+          "format": "password",
+          "description": "User's new password.",
+          "example": "NewSecureP@ssw0rd!"
+        },
+        "token": {
+          "type": "string",
+          "description": "Password reset token.",
+          "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        }
       },
       "required": ["password", "token"]
     },
-    "ResetToken": {
-      "type": "object",
-      "properties": {
-        "token": { "type": "string" }
-      },
-      "required": ["token"]
-    },
     "Product": {
       "type": "object",
+      "description": "Basic product information.",
       "properties": {
-        "id": { "type": "integer" },
-        "name": { "type": "string" },
-        "price": { "type": "number" },
-        "quantity": { "type": "integer" },
-        "photo": { "type": "string" },
-        "description": { "type": "string" }
+        "id": {
+          "type": "integer",
+          "description": "Unique identifier for the product.",
+          "example": 1
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the product.",
+          "example": "Red Rose"
+        },
+        "price": {
+          "type": "number",
+          "format": "float",
+          "description": "Price of the product.",
+          "example": 19.99
+        },
+        "quantity": {
+          "type": "integer",
+          "description": "Available quantity of the product.",
+          "example": 100
+        },
+        "short_description": {
+          "type": "string",
+          "description": "Short description of the product.",
+          "example": "A beautiful red rose."
+        },
+        "discount": {
+          "type": "integer",
+          "description": "Discount percentage on the product.",
+          "example": 10,
+          "nullable": true
+        },
+        "is_featured": {
+          "type": "boolean",
+          "description": "Indicates if the product is featured.",
+          "example": true
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of the product.",
+          "enum": ["FLOWER", "BOUQUET"],
+          "example": "FLOWER"
+        }
+      }
+    },
+    "ProductDetailed": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/Product"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "photo": {
+              "type": "string",
+              "description": "URL of the product photo.",
+              "example": "https://example.com/images/red_rose.jpg"
+            },
+            "description": {
+              "type": "string",
+              "description": "Detailed description of the product.",
+              "example": "A long stem red rose, perfect for romantic occasions."
+            },
+            "options": {
+              "type": "array",
+              "description": "List of product options.",
+              "items": {
+                "$ref": "#/definitions/OptionDetailed"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "OptionDetailed": {
+      "type": "object",
+      "description": "Detailed information about a product option.",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Unique identifier for the option.",
+          "example": 1
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the option.",
+          "example": "Color"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the option.",
+          "example": "Select the color of the flower."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of the option.",
+          "enum": ["DEFAULT", "COLOR", "SIZE", "MATERIAL", "OTHER"],
+          "example": "COLOR"
+        },
+        "images": {
+          "type": "array",
+          "description": "List of image URLs for the option.",
+          "items": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://example.com/images/red_option.jpg"
+          }
+        }
       }
     },
     "ProductList": {
       "type": "object",
+      "description": "List of products.",
       "properties": {
         "products": {
           "type": "array",
-          "items": { "$ref": "#/definitions/Product" }
+          "description": "Array of product objects.",
+          "items": {
+            "$ref": "#/definitions/Product"
+          }
         }
       }
     },
     "CreateProduct": {
       "type": "object",
+      "description": "Data required to create a new product.",
       "properties": {
-        "name": { "type": "string" },
-        "price": { "type": "number" },
-        "quantity": { "type": "integer" },
-        "photo": { "type": "string" },
-        "description": { "type": "string" },
-        "flower": { "type": "string", "enum": ["FLOWER", "BOUQUET"] }
+        "name": {
+          "type": "string",
+          "description": "Name of the product.",
+          "example": "Red Rose"
+        },
+        "price": {
+          "type": "number",
+          "format": "float",
+          "description": "Price of the product.",
+          "example": 19.99
+        },
+        "quantity": {
+          "type": "integer",
+          "description": "Available quantity of the product.",
+          "example": 100
+        },
+        "short_description": {
+          "type": "string",
+          "description": "Short description of the product.",
+          "example": "A beautiful red rose."
+        },
+        "discount": {
+          "type": "integer",
+          "description": "Discount percentage on the product.",
+          "example": 10,
+          "nullable": true
+        },
+        "is_featured": {
+          "type": "boolean",
+          "description": "Indicates if the product is featured.",
+          "example": false
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of the product.",
+          "enum": ["FLOWER", "BOUQUET"],
+          "example": "FLOWER"
+        },
+        "options": {
+          "type": "array",
+          "description": "List of product options.",
+          "items": {
+            "$ref": "#/definitions/CreateOption"
+          }
+        }
       },
-      "required": ["name", "price", "quantity", "flower", "description"]
+      "required": ["name", "price", "quantity", "short_description", "type"]
+    },
+    "CreateOption": {
+      "type": "object",
+      "description": "Data required to create a new product option.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the option.",
+          "example": "Color"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the option.",
+          "example": "Select the color of the flower."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of the option.",
+          "enum": ["DEFAULT", "COLOR", "SIZE", "MATERIAL", "OTHER"],
+          "example": "COLOR"
+        },
+        "images": {
+          "type": "array",
+          "description": "List of image URLs for the option.",
+          "items": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://example.com/images/red_option.jpg"
+          }
+        }
+      },
+      "required": ["name", "type"]
     },
     "UpdateProduct": {
       "type": "object",
+      "description": "Data required to update an existing product.",
       "properties": {
-        "name": { "type": "string" },
-        "price": { "type": "number" },
-        "quantity": { "type": "integer" },
-        "photo": { "type": "string" },
-        "description": { "type": "string" }
+        "name": {
+          "type": "string",
+          "description": "Name of the product.",
+          "example": "Red Rose Updated"
+        },
+        "price": {
+          "type": "number",
+          "format": "float",
+          "description": "Price of the product.",
+          "example": 24.99
+        },
+        "quantity": {
+          "type": "integer",
+          "description": "Available quantity of the product.",
+          "example": 80
+        },
+        "short_description": {
+          "type": "string",
+          "description": "Short description of the product.",
+          "example": "An updated beautiful red rose."
+        },
+        "discount": {
+          "type": "integer",
+          "description": "Discount percentage on the product.",
+          "example": 15,
+          "nullable": true
+        },
+        "is_featured": {
+          "type": "boolean",
+          "description": "Indicates if the product is featured.",
+          "example": true
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of the product.",
+          "enum": ["FLOWER", "BOUQUET"],
+          "example": "BOUQUET"
+        },
+        "options": {
+          "type": "array",
+          "description": "List of product options to update or add.",
+          "items": {
+            "$ref": "#/definitions/UpdateOption"
+          }
+        }
+      }
+    },
+    "UpdateOption": {
+      "type": "object",
+      "description": "Data required to update an existing product option or add a new one.",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the option to update. Omit to create a new option.",
+          "example": 1,
+          "nullable": true
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the option.",
+          "example": "Size"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the option.",
+          "example": "Select the size of the bouquet."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of the option.",
+          "enum": ["DEFAULT", "COLOR", "SIZE", "MATERIAL", "OTHER"],
+          "example": "SIZE"
+        },
+        "images": {
+          "type": "array",
+          "description": "List of image URLs for the option.",
+          "items": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://example.com/images/size_option.jpg"
+          }
+        }
       }
     },
     "User": {
       "type": "object",
+      "description": "User information.",
       "properties": {
-        "id": { "type": "integer" },
-        "username": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "role": { "type": "string", "enum": ["ADMIN", "USER"] },
+        "id": {
+          "type": "integer",
+          "description": "Unique identifier for the user.",
+          "example": 1
+        },
+        "username": {
+          "type": "string",
+          "description": "Username of the user.",
+          "example": "john_doe"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Email address of the user.",
+          "example": "john@example.com"
+        },
+        "role": {
+          "type": "string",
+          "description": "Role of the user.",
+          "enum": ["ADMIN", "USER"],
+          "example": "USER"
+        },
         "promocode": {
-          "$ref": "#/definitions/Promocode"
+          "$ref": "#/definitions/Promocode",
+          "description": "Current promocode applied to the user.",
+          "nullable": true
         }
       }
     },
     "UserList": {
       "type": "object",
+      "description": "List of users.",
       "properties": {
         "users": {
           "type": "array",
-          "items": { "$ref": "#/definitions/User" }
+          "description": "Array of user objects.",
+          "items": {
+            "$ref": "#/definitions/User"
+          }
         }
       }
     },
     "Promocode": {
       "type": "object",
+      "description": "Promocode information.",
       "properties": {
-        "id": { "type": "integer" },
-        "code": { "type": "string" },
-        "discount": { "type": "number" },
-        "count_usage": { "type": "integer" }
+        "id": {
+          "type": "integer",
+          "description": "Unique identifier for the promocode.",
+          "example": 1
+        },
+        "code": {
+          "type": "string",
+          "description": "Promocode code.",
+          "example": "SUMMER2024"
+        },
+        "discount": {
+          "type": "number",
+          "format": "float",
+          "description": "Discount percentage offered by the promocode.",
+          "example": 15.0
+        },
+        "count_usage": {
+          "type": "integer",
+          "description": "Number of times the promocode can be used.",
+          "example": 100
+        }
       }
     },
     "PromocodeList": {
       "type": "object",
+      "description": "List of promocodes.",
       "properties": {
         "promocodes": {
           "type": "array",
-          "items": { "$ref": "#/definitions/Promocode" }
+          "description": "Array of promocode objects.",
+          "items": {
+            "$ref": "#/definitions/Promocode"
+          }
         }
       }
     },
     "CreatePromocode": {
       "type": "object",
+      "description": "Data required to create a new promocode.",
       "properties": {
-        "code": { "type": "string" },
-        "discount": { "type": "number" },
-        "count_usage": { "type": "integer" }
+        "code": {
+          "type": "string",
+          "description": "Promocode code.",
+          "example": "SPRING2024"
+        },
+        "discount": {
+          "type": "number",
+          "format": "float",
+          "description": "Discount percentage offered by the promocode.",
+          "example": 20.0
+        },
+        "count_usage": {
+          "type": "integer",
+          "description": "Number of times the promocode can be used.",
+          "example": 50
+        }
       },
       "required": ["code", "discount", "count_usage"]
     },
     "UpdatePromocode": {
       "type": "object",
+      "description": "Data required to update an existing promocode.",
       "properties": {
-        "code": { "type": "string" },
-        "discount": { "type": "number" },
-        "count_usage": { "type": "integer" }
+        "code": {
+          "type": "string",
+          "description": "Promocode code.",
+          "example": "SPRING2024"
+        },
+        "discount": {
+          "type": "number",
+          "format": "float",
+          "description": "Discount percentage offered by the promocode.",
+          "example": 25.0
+        },
+        "count_usage": {
+          "type": "integer",
+          "description": "Number of times the promocode can be used.",
+          "example": 60
+        }
       }
     },
     "AddToCart": {
       "type": "object",
+      "description": "Data required to add products to the cart.",
       "properties": {
         "products": {
           "type": "array",
+          "description": "List of products to add to the cart.",
           "items": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "integer" },
-              "quantity": { "type": "integer" }
-            },
-            "required": ["id", "quantity"]
+            "$ref": "#/definitions/AddToCartProduct"
           }
         }
       },
       "required": ["products"]
     },
+    "AddToCartProduct": {
+      "type": "object",
+      "description": "Product details to add to the cart.",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the product.",
+          "example": 1
+        },
+        "quantity": {
+          "type": "integer",
+          "description": "Quantity of the product to add.",
+          "example": 2
+        }
+      },
+      "required": ["id", "quantity"]
+    },
     "AddToCartResponse": {
       "type": "object",
+      "description": "Response after adding products to the cart.",
       "properties": {
-        "message": { "type": "string" },
-        "total_price": { "type": "number" }
+        "message": {
+          "type": "string",
+          "description": "Confirmation message.",
+          "example": "Products added to cart successfully"
+        },
+        "total_price": {
+          "type": "number",
+          "format": "float",
+          "description": "Total price of the cart after adding products.",
+          "example": 39.98
+        }
       }
     },
     "CartItem": {
       "type": "object",
+      "description": "Details of a cart item.",
       "properties": {
-        "id": { "type": "integer" },
-        "product_id": { "type": "integer" },
-        "name": { "type": "string" },
-        "price": { "type": "number" },
-        "photo": { "type": "string" },
-        "quantity": { "type": "integer" },
-        "actual_quantity": { "type": "integer" },
-        "message": { "type": "string", "nullable": true }
+        "id": {
+          "type": "integer",
+          "description": "Unique identifier for the cart item.",
+          "example": 1
+        },
+        "product_id": {
+          "type": "integer",
+          "description": "ID of the associated product.",
+          "example": 1
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the product.",
+          "example": "Red Rose"
+        },
+        "price": {
+          "type": "number",
+          "format": "float",
+          "description": "Price of the product.",
+          "example": 19.99
+        },
+        "discount": {
+          "type": "integer",
+          "description": "Discount percentage on the product.",
+          "example": 10,
+          "nullable": true
+        },
+        "short_description": {
+          "type": "string",
+          "description": "Short description of the product.",
+          "example": "A beautiful red rose."
+        },
+        "actual_quantity": {
+          "type": "integer",
+          "description": "Current available quantity of the product.",
+          "example": 100
+        },
+        "quantity": {
+          "type": "integer",
+          "description": "Requested quantity of the product.",
+          "example": 2
+        },
+        "message": {
+          "type": "string",
+          "description": "Message indicating any updates to the quantity.",
+          "nullable": true,
+          "example": "Product quantity updated"
+        }
       }
     },
     "CartResponse": {
       "type": "object",
+      "description": "Response containing cart items and applied promocode.",
       "properties": {
         "cart_items": {
           "type": "array",
-          "items": { "$ref": "#/definitions/CartItem" }
+          "description": "List of items in the cart.",
+          "items": {
+            "$ref": "#/definitions/CartItem"
+          }
         },
         "promocode": {
-          "type": "object",
-          "properties": {
-            "code": { "type": "string" },
-            "discount": { "type": "number" }
-          },
+          "$ref": "#/definitions/Promocode",
+          "description": "Current promocode applied to the cart.",
           "nullable": true
         }
       }
     },
     "ModifyCartItem": {
       "type": "object",
+      "description": "Data required to modify a cart item's quantity.",
       "properties": {
-        "quantity": { "type": "integer" }
+        "quantity": {
+          "type": "integer",
+          "description": "New quantity for the cart item.",
+          "example": 3
+        }
       },
       "required": ["quantity"]
     },
     "PurchaseResponse": {
       "type": "object",
+      "description": "Response after processing a purchase.",
       "properties": {
-        "payment_link": { "type": "string" }
+        "payment_link": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to complete the payment.",
+          "example": "https://checkout.stripe.com/pay/cs_test_a1b2c3d4e5f6g7h8i9j0"
+        }
       }
     },
     "Order": {
       "type": "object",
+      "description": "Order information.",
       "properties": {
-        "id": { "type": "integer" },
-        "status": { "type": "string", "enum": ["PENDING", "COMPLETED", "CANCELLED"] },
-        "created_at": { "type": "string", "format": "date-time" },
-        "user": { "$ref": "#/definitions/User" },
-        "promocode": { "$ref": "#/definitions/Promocode" },
+        "id": {
+          "type": "integer",
+          "description": "Unique identifier for the order.",
+          "example": 1
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the order.",
+          "enum": ["PENDING", "COMPLETED", "CANCELLED"],
+          "example": "PENDING"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the order was created.",
+          "example": "2024-04-01T12:34:56Z"
+        },
+        "user": {
+          "$ref": "#/definitions/User",
+          "description": "Information about the user who placed the order."
+        },
+        "promocode": {
+          "$ref": "#/definitions/Promocode",
+          "description": "Promocode applied to the order.",
+          "nullable": true
+        },
         "items": {
           "type": "array",
-          "items": { "$ref": "#/definitions/OrderItem" }
+          "description": "List of items in the order.",
+          "items": {
+            "$ref": "#/definitions/OrderItem"
+          }
         }
       }
     },
     "OrderItem": {
       "type": "object",
+      "description": "Details of an item in an order.",
       "properties": {
-        "id": { "type": "integer" },
-        "product_id": { "type": "integer" },
-        "product_name": { "type": "string" },
-        "quantity": { "type": "integer" },
-        "price": { "type": "number" }
+        "id": {
+          "type": "integer",
+          "description": "Unique identifier for the order item.",
+          "example": 1
+        },
+        "product_id": {
+          "type": "integer",
+          "description": "ID of the associated product.",
+          "example": 1
+        },
+        "product_name": {
+          "type": "string",
+          "description": "Name of the product.",
+          "example": "Red Rose"
+        },
+        "product_description": {
+          "type": "string",
+          "description": "Description of the product.",
+          "example": "A beautiful red rose."
+        },
+        "product_photo": {
+          "type": "string",
+          "description": "URL of the product photo.",
+          "example": "https://example.com/images/red_rose.jpg"
+        },
+        "quantity": {
+          "type": "integer",
+          "description": "Quantity of the product ordered.",
+          "example": 2
+        },
+        "price": {
+          "type": "number",
+          "format": "float",
+          "description": "Price of the product at the time of order.",
+          "example": 19.99
+        }
       }
     },
     "OrderList": {
       "type": "object",
+      "description": "List of orders.",
       "properties": {
         "orders": {
           "type": "array",
-          "items": { "$ref": "#/definitions/Order" }
+          "description": "Array of order objects.",
+          "items": {
+            "$ref": "#/definitions/Order"
+          }
+        }
+      }
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "description": "Error response object.",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Error message describing what went wrong.",
+          "example": "Invalid credentials"
+        },
+        "code": {
+          "type": "integer",
+          "description": "HTTP status code.",
+          "example": 401
+        }
+      }
+    },
+    "SuccessResponse": {
+      "type": "object",
+      "description": "Success response object.",
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "Status of the operation.",
+          "example": "success"
+        },
+        "message": {
+          "type": "string",
+          "description": "Additional message about the operation.",
+          "example": "Password changed successfully"
         }
       }
     }
