@@ -132,6 +132,7 @@ class Product(db.Model):
     name: Mapped[str]
     price: Mapped[float]
     quantity: Mapped[int]
+    short_description: Mapped[str]
     type: Mapped[Flower] = mapped_column(Enum(Flower, native_enum=True))
     options = db.relationship("Option", backref=backref("product", passive_deletes=True), cascade="all, delete-orphan")
     order_items = db.relationship("OrderItem", backref=backref("product", passive_deletes=True), cascade=None)
@@ -443,6 +444,7 @@ def handle_product(id):
             "name": product.name,
             "price": product.price,
             "quantity": product.quantity,
+            "short_description": product.short_description,
             "photo": product.photo,
             "description": product.description,
             "type": product.type.value,
@@ -471,6 +473,7 @@ def modify_or_delete_product(user, product):
         product.quantity = data.get("quantity", product.quantity)
         product.photo = data.get("photo", product.photo)
         product.description = data.get("description", product.description)
+        product.short_description = data.get("short_description", product.short_description)
         product_type = data.get("type")
         if product_type:
             try:
@@ -535,6 +538,7 @@ def products():
                 "name": p.name,
                 "price": p.price,
                 "quantity": p.quantity,
+                "short_description": p.short_description,
                 "type": p.type.value,
                 "options": [
                     {
@@ -559,7 +563,7 @@ def create_product(current_user: User):
         return jsonify({"message": "Unauthorized"}), 403
 
     data = request.json
-    required = {"name", "price", "quantity", "type"}
+    required = {"name", "price", "quantity", "type", "short_description"}
     if not required.issubset(data):
         return (
             jsonify(
@@ -578,6 +582,7 @@ def create_product(current_user: User):
         name=data["name"],
         price=data["price"],
         quantity=data["quantity"],
+        short_description=data["short_description"],
         type=product_type,
     )
 
@@ -726,6 +731,7 @@ def view_cart(user):
                     "price": product.price,
                     "photo": product.photo,
                     "quantity": item.quantity,
+                    "short_description": product.short_description,
                     "actual_quantity": product.quantity,
                     "message": (
                         "Product quantity updated" if quantity < item.quantity else None
