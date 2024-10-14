@@ -54,7 +54,7 @@
     }
   ],
   "schemes": ["https", "http"],
-  "host": "api.zieduveikals.com",
+  "host": "https://ziedu-veikals.vercel.app",
   "basePath": "/",
   "paths": {
     "/register": {
