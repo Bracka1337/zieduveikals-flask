@@ -18,6 +18,7 @@ from flask_swagger_ui import get_swaggerui_blueprint
 from stripe.checkout import Session
 from flask_mail import Mail, Message
 import redis
+from sqlalchemy.orm import joinedload
 
 
 load_dotenv()
@@ -69,7 +70,6 @@ class OptionType(enum.Enum):
     COLOR = "COLOR"
     SIZE = "SIZE"
     MATERIAL = "MATERIAL"
-    OTHER = "OTHER"
 
 class User(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -469,65 +469,135 @@ def modify_or_delete_product(user, product):
     if request.method == "PATCH":
         data = request.json
 
+        # Update product fields with incoming data or retain existing values
         product.name = data.get("name", product.name)
         product.price = data.get("price", product.price)
         product.quantity = data.get("quantity", product.quantity)
         product.short_description = data.get("short_description", product.short_description)
         product.discount = data.get("discount", product.discount)
         product.is_featured = data.get("is_featured", product.is_featured)
+
+        # Update product type if provided
         product_type = data.get("type")
         if product_type:
             try:
-                product.type = Flower(product_type)
+                product.type = Flower(product_type)  # Assuming Flower is an Enum or similar
             except ValueError:
                 return jsonify({"message": "Invalid product type"}), 400
 
-        # Handle options if provided
+        # Handle options
         options_data = data.get("options")
-        if options_data:
-            for option in options_data:
-                option_id = option.get("id")
-                if option_id:
-                    # Update existing option
-                    existing_option = db.session.query(Option).filter_by(id=option_id, product_id=product.id).first()
-                    if existing_option:
-                        existing_option.name = option.get("name", existing_option.name)
-                        existing_option.description = option.get("description", existing_option.description)
-                        option_type = option.get("type")
-                        if option_type:
-                            try:
-                                existing_option.type = OptionType(option_type)
-                            except ValueError:
-                                return jsonify({"message": "Invalid option type"}), 400
-                        # Handle images
-                        images = option.get("images")
-                        if images:
-                            # Clear existing images and add new ones
-                            existing_option.images = []
-                            for img_url in images:
-                                existing_option.images.append(Image(url=img_url))
-                else:
-                    # Create new option
-                    new_option = Option(
-                        name=option["name"],
-                        description=option.get("description"),
-                        type=OptionType(option["type"]),
-                        product=product
-                    )
-                    images = option.get("images", [])
-                    for img_url in images:
-                        new_option.images.append(Image(url=img_url))
-                    db.session.add(new_option)
 
-        # Optionally handle deletion of options if needed
+        if options_data is not None:
+            if isinstance(options_data, list):
+                # Extract incoming option IDs
+                incoming_option_ids = [option.get("id") for option in options_data if option.get("id")]
 
-        db.session.commit()
-        return jsonify({"status": "success", "message": "Product updated"}), 200
+                # Retrieve existing options from the database
+                existing_options = db.session.query(Option).filter_by(product_id=product.id).options(joinedload(Option.images)).all()
 
-    if request.method == "DELETE":
-        db.session.delete(product)
-        db.session.commit()
-        return jsonify({"status": "success", "message": "Product deleted"}), 200
+                # Determine which existing options to delete (those not present in incoming_option_ids)
+                options_to_delete = [option for option in existing_options if option.id not in incoming_option_ids]
+
+                for option in options_to_delete:
+                    db.session.delete(option)  # Ensure cascading deletes for associated images
+
+                # Process incoming options: update existing or add new ones
+                for option_data in options_data:
+                    option_id = option_data.get("id")
+                    if option_id:
+                        # Update existing option
+                        existing_option = next((opt for opt in existing_options if opt.id == option_id), None)
+                        if existing_option:
+                            existing_option.name = option_data.get("name", existing_option.name)
+                            existing_option.description = option_data.get("description", existing_option.description)
+
+                            # Update option type if provided
+                            option_type = option_data.get("type")
+                            if option_type:
+                                try:
+                                    existing_option.type = OptionType(option_type)  # Assuming OptionType is an Enum
+                                except ValueError:
+                                    return jsonify({"message": "Invalid option type"}), 400
+
+                            # Handle images
+                            images = option_data.get("images")
+                            if images is not None:
+                                # Clear existing images
+                                existing_option.images.clear()
+                                # Add new images
+                                for img_url in images:
+                                    new_image = Image(url=img_url)
+                                    existing_option.images.append(new_image)
+                    else:
+                        # Create new option
+                        try:
+                            new_option = Option(
+                                name=option_data["name"],
+                                description=option_data.get("description"),
+                                type=OptionType(option_data["type"]),
+                                product=product  # Assuming a relationship is defined
+                            )
+                        except KeyError as e:
+                            return jsonify({"message": f"Missing required field: {str(e)}"}), 400
+                        except ValueError:
+                            return jsonify({"message": "Invalid option type"}), 400
+
+                        # Add images to the new option
+                        images = option_data.get("images", [])
+                        for img_url in images:
+                            new_image = Image(url=img_url)
+                            new_option.images.append(new_image)
+
+                        db.session.add(new_option)
+            else:
+                return jsonify({"message": "Options data must be a list"}), 400
+        else:
+            # If 'options' is not provided, delete all existing options
+            existing_options = db.session.query(Option).filter_by(product_id=product.id).all()
+            for option in existing_options:
+                db.session.delete(option)
+
+        try:
+            db.session.commit()
+            product_data = {
+            "id": product.id,
+            "name": product.name,
+            "price": product.price,
+            "quantity": product.quantity,
+            "short_description": product.short_description,
+            "discount": product.discount,
+            "is_featured": product.is_featured,
+            "type": product.type.value,
+            "options": [
+                {
+                "id": option.id,
+                "name": option.name,
+                "description": option.description,
+                "type": option.type.value,
+                "images": [image.url for image in option.images],
+                }
+                for option in product.options
+            ],
+            }
+            return jsonify({"status": "success", "message": "Product updated", "product": product_data}), 200
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating product {product.id}: {e}")
+            return jsonify({"message": "An error occurred while updating the product."}), 500
+
+    elif request.method == "DELETE":
+        try:
+            db.session.delete(product)
+            db.session.commit()
+            return jsonify({"status": "success", "message": "Product deleted"}), 200
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error deleting product {product.id}: {e}")
+            return jsonify({"message": "An error occurred while deleting the product."}), 500
+
+    else:
+        return jsonify({"message": "Method not allowed"}), 405
 
 @app.route("/products", methods=["GET", "POST"])
 def products():
@@ -559,7 +629,6 @@ def products():
         return jsonify({"products": products_data}), 200
 
     return create_product()
-
 
 @role_required(Role.ADMIN)
 def create_product(current_user: User):
@@ -615,8 +684,29 @@ def create_product(current_user: User):
 
     db.session.add(product)
     db.session.commit()
-    return jsonify({"status": "success"}), 201
 
+    product_data = {
+        "id": product.id,
+        "name": product.name,
+        "price": product.price,
+        "quantity": product.quantity,
+        "short_description": product.short_description,
+        "discount": product.discount,
+        "is_featured": product.is_featured,
+        "type": product.type.value,
+        "options": [
+            {
+                "id": option.id,
+                "name": option.name,
+                "description": option.description,
+                "type": option.type.value,
+                "images": [image.url for image in option.images],
+            }
+            for option in product.options
+        ],
+    }
+
+    return jsonify({"status": "success", "product": product_data}), 201
 
 
 @app.route("/featured_products", methods=["GET"])
@@ -676,27 +766,112 @@ def get_users(user):
         )
     return jsonify({"users": user_list})
 
+
+@app.route("/user/<int:user_id>", methods=["GET", "PATCH", "DELETE"])
+@role_required(Role.ADMIN)
+def handle_user(current_user, user_id):
+    user = db.session.query(User).filter_by(id=user_id).first()
+    
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    if request.method == "GET":
+        promocode_data = (
+            {
+                "id": user.current_promocode.id,
+                "code": user.current_promocode.code,
+                "discount": user.current_promocode.discount,
+                "count_usage": user.current_promocode.count_usage,
+            }
+            if user.current_promocode
+            else None
+        )
+        
+        user_data = {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "role": user.role.value,
+            "promocode": promocode_data,
+        }
+        return jsonify({"user": user_data}), 200
+
+    elif request.method == "PATCH":
+        data = request.json
+        allowed_fields = {"username", "email", "role", "promocode_id"}
+        update_data = {k: v for k, v in data.items() if k in allowed_fields}
+
+        if not update_data:
+            return jsonify({"message": "No valid fields to update"}), 400
+
+        # Handle role update
+        if "role" in update_data:
+            try:
+                update_data["role"] = Role(update_data["role"])
+            except ValueError:
+                return jsonify({"message": "Invalid role specified"}), 400
+
+        # Handle promocode update
+        if "promocode_id" in update_data:
+            if update_data["promocode_id"] is not None:
+                promocode = db.session.query(Promocode).filter_by(id=update_data["promocode_id"]).first()
+                if not promocode:
+                    return jsonify({"message": "Promocode not found"}), 404
+            else:
+                update_data["promocode_id"] = None
+
+        try:
+            for key, value in update_data.items():
+                setattr(user, key, value)
+            db.session.commit()
+            return jsonify({"status": "success", "message": "User updated successfully"}), 200
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error updating user {user_id}: {e}")
+            return jsonify({"message": "An error occurred while updating the user."}), 500
+
+    elif request.method == "DELETE":
+        try:
+            db.session.delete(user)
+            db.session.commit()
+            return jsonify({"status": "success", "message": "User deleted successfully"}), 200
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error deleting user {user_id}: {e}")
+            return jsonify({"message": "An error occurred while deleting the user."}), 500
+
+    else:
+        return jsonify({"message": "Method not allowed"}), 405
+
 def filter_products(products):
     product_ids = [product["id"] for product in products]
     db_products = db.session.query(Product).filter(Product.id.in_(product_ids)).all()
     db_product_dict = {db_product.id: db_product for db_product in db_products}
 
     total_price = 0.0
+    filtered_products = []
 
-    for product in products[:]:
+    for product in products:
         db_product = db_product_dict.get(product["id"])
         if db_product:
             if db_product.quantity < product["quantity"]:
                 product["quantity"] = db_product.quantity
                 product["name"] = db_product.name
-            if db_product.quantity == 0 or product["quantity"] == 0:
-                products.remove(product)
-            else:
-                total_price += product["quantity"] * db_product.price * (1 - db_product.discount / 100)
-        else:
-            products.remove(product)
 
-    return {"products": products, "total_price": total_price}
+            if db_product.quantity == 0 or product["quantity"] == 0:
+                continue  
+            else:
+                if db_product.discount is not None:
+                    discount_factor = 1 - (db_product.discount / 100)
+                else:
+                    discount_factor = 1 
+
+                total_price += product["quantity"] * db_product.price * discount_factor
+                filtered_products.append(product)
+
+    return {"products": filtered_products, "total_price": total_price}
+
+    
 
 @app.route("/add", methods=["POST"])
 @role_required(Role.USER)
@@ -833,27 +1008,44 @@ def modify_or_delete_cart_item(user, id):
         return jsonify({"message": "Cart item deleted successfully"}), 200
 
 def count_total_price(cart_items):
+    # Extract product IDs from cart items
     ids = [item.product_id for item in cart_items]
+    
+    # Fetch products from the database that match the IDs
     products = db.session.query(Product).filter(Product.id.in_(ids)).all()
+    
+    # Create a dictionary for quick lookup of products by ID
     product_dict = {product.id: product for product in products}
 
     total_price = 0.0
-
     new_cart_items = []
 
     for item in cart_items:
         product = product_dict.get(item.product_id)
-        new_item = {}
         if product and product.quantity > 0:
-            new_item["product_id"] = product.id
-            new_item["quantity"] = min(item.quantity, product.quantity)
-            new_item["price"] = product.price
-            new_item["name"] = product.name
-            new_item["discount"] = product.discount
-            total_price += item.quantity * product.price * (1-product.discount/100)
+            adjusted_quantity = min(item.quantity, product.quantity)
+            
+            # Prepare the new cart item with adjusted details
+            new_item = {
+                "product_id": product.id,
+                "quantity": adjusted_quantity,
+                "price": product.price,
+                "name": product.name,
+                "discount": product.discount
+            }
+            
+            # Determine the discount factor
+            if product.discount is not None:
+                discount_factor = 1 - (product.discount / 100)
+            else:
+                discount_factor = 1  # No discount applied
+            
+            # Calculate the total price using the adjusted quantity
+            total_price += adjusted_quantity * product.price * discount_factor
             new_cart_items.append(new_item)
 
     return {"total_price": total_price, "products": new_cart_items}
+
 
 
 def create_payment_link(filtered, promocode) -> Session:
@@ -1074,7 +1266,7 @@ def promocodes(current_user):
         )
         db.session.add(promo)
         db.session.commit()
-        return jsonify({"status": "success"}), 201
+        return jsonify({"status": "success", "code": data["code"], "discount": data["discount"], "count_usage": data["count_usage"]}), 201
 
 @app.route("/promocode/<string:id>", methods=["PATCH", "DELETE", "POST"])
 @role_required(Role.USER)
@@ -1109,7 +1301,14 @@ def edit_delete_promocode(promocode, user):
         promocode.discount = data.get("discount", promocode.discount)
         promocode.count_usage = data.get("count_usage", promocode.count_usage)
         db.session.commit()
-        return jsonify({"status": "success", "message": "Promocode updated"}), 200
+        return jsonify({
+            "status": "success",
+            "message": "Promocode updated",
+                "id": promocode.id,
+                "code": promocode.code,
+                "discount": promocode.discount,
+                "count_usage": promocode.count_usage
+        }), 200
 
     if request.method == "DELETE":
         db.session.delete(promocode)
