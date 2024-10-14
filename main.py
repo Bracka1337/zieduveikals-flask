@@ -47,7 +47,7 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 swagger_ui_blueprint = get_swaggerui_blueprint(
-    "/swagger", "/static/swagger.json", config={"app_name": "ZieduVeikals"}
+    "/swagger", "/static/swagger.yaml", config={"app_name": "ZieduVeikals"}
 )
 app.register_blueprint(swagger_ui_blueprint, url_prefix="/swagger")
 
