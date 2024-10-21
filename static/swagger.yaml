@@ -6,7 +6,7 @@ info:
 servers:
   - url: http://localhost:5000
     description: Development server
-  - url: https://yourdomain.com
+  - url: https://ziedu-veikals.vercel.app/
     description: Production server
 tags:
   - name: Authentication

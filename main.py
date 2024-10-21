@@ -1091,7 +1091,7 @@ def modify_or_delete_cart_item(user, id):
 
         return jsonify({"message": "Cart item deleted successfully"}), 200
 
-def count_total_price(cart_items):
+def count_total_price(cart_items, customer_status):
     # Extract product IDs from cart items
     ids = [item.product_id for item in cart_items]
     
@@ -1113,7 +1113,7 @@ def count_total_price(cart_items):
             new_item = {
                 "product_id": product.id,
                 "quantity": adjusted_quantity,
-                "price": product.price,
+                "price": product.price if customer_status == "fiz" else product.price*0.79,
                 "name": product.name,
                 "discount": product.discount
             }
@@ -1171,6 +1171,7 @@ def create_payment_link(filtered, promocode) -> Session:
 @app.route("/buy", methods=["POST"])
 @role_required(Role.USER)
 def buy(user):
+
     order_items = db.session.query(CartItem).filter_by(user_id=user.id).all()
 
     if not order_items:
@@ -1185,7 +1186,11 @@ def buy(user):
     ):
         return jsonify({"message": "You have a pending order"}), 400
 
-    filtered = count_total_price(order_items)
+    data = request.json
+
+    customer_status = data.get("customer_status")
+
+    filtered = count_total_price(order_items, customer_status)
     print(filtered)
     if len(filtered["products"]) == 0:
         return jsonify({"message": "No products found or product quantity is 0"}), 404
