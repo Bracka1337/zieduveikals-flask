@@ -23,10 +23,6 @@ from sqlalchemy.orm import joinedload
 
 load_dotenv()
 
-redis_url = os.getenv("REDIS_URL")
-r = redis.from_url(redis_url)
-
-REFRESH_TOKEN_SECRET = os.getenv("REFRESH_TOKEN_SECRET")
 ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 REFRESH_PASSWORD_SECRET = os.getenv("REFRESH_PASSWORD_SECRET")
@@ -69,7 +65,6 @@ class OptionType(enum.Enum):
     DEFAULT = "DEFAULT"
     COLOR = "COLOR"
     SIZE = "SIZE"
-    MATERIAL = "MATERIAL"
 
 class User(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -128,7 +123,6 @@ class Order(db.Model):
 class Product(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
-    price: Mapped[float]
     quantity: Mapped[int]
     short_description: Mapped[str]
     discount: Mapped[int] = mapped_column(nullable=True)
@@ -142,6 +136,7 @@ class Option(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
     description: Mapped[str] = mapped_column(nullable=True)
+    price: Mapped[float] = mapped_column(nullable=True)
     type: Mapped[OptionType] = mapped_column(Enum(OptionType, native_enum=True))
     product_id: Mapped[int] = mapped_column(db.ForeignKey("product.id", ondelete='CASCADE'))
     images = db.relationship("Image", backref=backref("option", passive_deletes=True), cascade="all, delete-orphan")
@@ -168,7 +163,11 @@ class CartItem(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(db.ForeignKey("user.id", ondelete='CASCADE'))
     product_id: Mapped[int] = mapped_column(db.ForeignKey("product.id", ondelete='CASCADE'))
+    option_id: Mapped[int] = mapped_column(db.ForeignKey("option.id", ondelete='CASCADE'), nullable=True) 
     quantity: Mapped[int]
+    
+    selected_option = db.relationship("Option")  
+
 
 def role_required(role):
     def decorator(f):
@@ -235,75 +234,19 @@ def login():
     user = db.session.query(User).filter_by(username=username).first()
 
     if user and bcrypt.checkpw(password.encode("utf-8"), user.password.encode("utf-8")):
-        refresh_token = jwt.encode(
-            {
-                "sub": username,
-                "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
-            },
-            REFRESH_TOKEN_SECRET,
-            algorithm="HS256",
-        )
-
-        r.setex(f"refresh_token:{username}", 3600, refresh_token)
-
         access_token = jwt.encode(
             {
                 "sub": username,
-                "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=15),
+                "exp": datetime.datetime.utcnow() + datetime.timedelta(days=365*100),
             },
             ACCESS_TOKEN_SECRET,
             algorithm="HS256",
         )
 
-        return jsonify({"refresh_token": refresh_token, "access_token": access_token})
+        return jsonify({"access_token": access_token})
     else:
         return jsonify({"message": "Invalid credentials"}), 401
 
-@app.route("/refresh", methods=["POST"])
-def refresh():
-    data = request.json
-    refresh_token = data.get("refresh_token")
-
-    if not refresh_token:
-        return jsonify({"message": "Refresh token is required"}), 400
-
-    try:
-        decoded_token = jwt.decode(
-            refresh_token, REFRESH_TOKEN_SECRET, algorithms=["HS256"]
-        )
-        username = decoded_token["sub"]
-
-        redis_refresh_token = r.get(f"refresh_token:{username}")
-        if not redis_refresh_token or redis_refresh_token.decode('utf-8') != refresh_token:
-            return jsonify({"message": "Invalid or expired refresh token"}), 401
-
-        access_token = jwt.encode(
-            {
-                "sub": username,
-                "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=15),
-            },
-            ACCESS_TOKEN_SECRET,
-            algorithm="HS256",
-        )
-
-        new_refresh_token = jwt.encode(
-            {
-                "sub": username,
-                "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
-            },
-            REFRESH_TOKEN_SECRET,
-            algorithm="HS256",
-        )
-
-        r.setex(f"refresh_token:{username}", 3600, new_refresh_token)
-
-        return jsonify(
-            {"access_token": access_token, "refresh_token": new_refresh_token}
-        )
-    except jwt.ExpiredSignatureError:
-        return jsonify({"message": "Expired refresh token"}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({"message": "Invalid refresh token"}), 401
 
 @app.route("/change_password", methods=["PATCH"])
 @role_required(Role.USER)
@@ -974,10 +917,19 @@ def add(user):
     for product in filtered["products"]:
         product_id = product["id"]
         quantity = product["quantity"]
+        option_id = product.get("option_id")  
+
+        if option_id:
+            option = db.session.query(Option).filter_by(id=option_id, product_id=product_id).first()
+            if not option:
+                return jsonify({"message": f"Invalid option_id {option_id} for product_id {product_id}"}), 400
+            price = option.price if option.price else db.session.query(Product).filter_by(id=product_id).first().price
+        else:
+            price = db.session.query(Product).filter_by(id=product_id).first().price
 
         cart_item = (
             db.session.query(CartItem)
-            .filter_by(user_id=user.id, product_id=product_id)
+            .filter_by(user_id=user.id, product_id=product_id, option_id=option_id)
             .first()
         )
 
@@ -985,7 +937,10 @@ def add(user):
             cart_item.quantity += quantity
         else:
             cart_item = CartItem(
-                user_id=user.id, product_id=product_id, quantity=quantity
+                user_id=user.id,
+                product_id=product_id,
+                option_id=option_id,  
+                quantity=quantity
             )
             db.session.add(cart_item)
 
@@ -1000,6 +955,7 @@ def add(user):
         ),
         201,
     )
+
 
 @app.route("/cart", methods=["GET", "DELETE"])
 @role_required(Role.USER)
@@ -1016,17 +972,27 @@ def view_cart(user):
         for item in cart_items:
             product = product_dict.get(item.product_id)
             if product:
+                selected_option = db.session.query(Option).filter_by(id=item.option_id).first() if item.option_id else None
+                option_image = selected_option.images[0].url if selected_option and selected_option.images else None
+
                 quantity = min(item.quantity, product.quantity)
 
                 serialized_item = {
                     "id": item.id,
                     "product_id": product.id,
                     "name": product.name,
-                    "price": product.price,
+                    "price": selected_option.price if selected_option and selected_option.price else product.price,
                     "quantity": item.quantity,
                     "discount": product.discount,
                     "short_description": product.short_description,
                     "actual_quantity": product.quantity,
+                    "selected_option": {
+                        "id": selected_option.id,
+                        "name": selected_option.name,
+                        "type": selected_option.type.value,
+                        "price": selected_option.price,
+                        "image": option_image
+                    } if selected_option else None,
                     "message": (
                         "Product quantity updated" if quantity < item.quantity else None
                     ),
@@ -1109,7 +1075,6 @@ def count_total_price(cart_items, customer_status):
         if product and product.quantity > 0:
             adjusted_quantity = min(item.quantity, product.quantity)
             
-            # Prepare the new cart item with adjusted details
             new_item = {
                 "product_id": product.id,
                 "quantity": adjusted_quantity,
@@ -1118,13 +1083,11 @@ def count_total_price(cart_items, customer_status):
                 "discount": product.discount
             }
             
-            # Determine the discount factor
             if product.discount is not None:
                 discount_factor = 1 - (product.discount / 100)
             else:
-                discount_factor = 1  # No discount applied
+                discount_factor = 1  
             
-            # Calculate the total price using the adjusted quantity
             total_price += adjusted_quantity * product.price * discount_factor
             new_cart_items.append(new_item)
 
@@ -1135,12 +1098,23 @@ def count_total_price(cart_items, customer_status):
 def create_payment_link(filtered, promocode) -> Session:
     line_items = []
     for product in filtered["products"]:
-        unit_amount = int(round(product["price"] * 100)) 
+        option_id = product.get("option_id")
+        if option_id:
+            option = db.session.query(Option).filter_by(id=option_id).first()
+            unit_price = option.price if option and option.price else db.session.query(Product).filter_by(id=product["product_id"]).first().price
+        else:
+            unit_price = db.session.query(Product).filter_by(id=product["product_id"]).first().price
+
+
         if product["discount"]:
-            unit_amount = round(unit_amount * (1 - product["discount"] / 100))
+            unit_price = round(unit_price * (1 - product["discount"] / 100))
+        
         if promocode:
-            unit_amount = round(unit_amount * (1 - promocode.discount / 100))
-            unit_amount = int(unit_amount)
+            unit_price = round(unit_price * (1 - promocode.discount / 100))
+            unit_price = int(unit_price * 100) 
+
+        else:
+            unit_price = int(unit_price * 100)  
         
 
         line_item = {
@@ -1209,21 +1183,24 @@ def buy(user):
 
     for product in filtered["products"]:
         db_product = db.session.query(Product).filter_by(id=product["product_id"]).first()
-        print(db_product)
         if db_product:
             db_product.quantity -= product["quantity"]
+            option_id = product.get("option_id")
+            option = db.session.query(Option).filter_by(id=option_id).first() if option_id else None
+            price = option.price if option and option.price else db_product.price
+
             db.session.add(
                 OrderItem(
                     order_id=new_order.id,
                     product_id=product["product_id"],
+                    option_id=option_id, 
                     quantity=product["quantity"],
-                    price=db_product.price,
-                    product_name=db_product.name,  # Save product name
-                    #product_description=db_product.description,  # Save product description
-                    #product_photo=db_product.photo  # Save product photo
+                    price=price, 
+                    product_name=db_product.name,
+                    product_description=db_product.short_description, 
+                    product_photo=option.images[0].url if option and option.images else None, 
                 )
             )
-
 
     db.session.commit()
 
