@@ -70,7 +70,7 @@ components:
           format: email
           example: johndoe@example.com
         role:
-          $ref: '#/components/schemas/Role'
+          $ref: "#/components/schemas/Role"
     Promocode:
       type: object
       properties:
@@ -113,11 +113,11 @@ components:
           type: boolean
           example: true
         type:
-          $ref: '#/components/schemas/Flower'
+          $ref: "#/components/schemas/Flower"
         options:
           type: array
           items:
-            $ref: '#/components/schemas/Option'
+            $ref: "#/components/schemas/Option"
     Option:
       type: object
       properties:
@@ -131,7 +131,7 @@ components:
           type: string
           example: Choose the color of the roses.
         type:
-          $ref: '#/components/schemas/OptionType'
+          $ref: "#/components/schemas/OptionType"
         images:
           type: array
           items:
@@ -202,7 +202,7 @@ components:
           type: integer
           example: 1
         status:
-          $ref: '#/components/schemas/Status'
+          $ref: "#/components/schemas/Status"
         created_at:
           type: string
           format: date-time
@@ -214,11 +214,11 @@ components:
           type: integer
           example: 1
         promocode:
-          $ref: '#/components/schemas/Promocode'
+          $ref: "#/components/schemas/Promocode"
         items:
           type: array
           items:
-            $ref: '#/components/schemas/OrderItem'
+            $ref: "#/components/schemas/OrderItem"
     LoginResponse:
       type: object
       properties:
@@ -349,9 +349,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterRequest'
+              $ref: "#/components/schemas/RegisterRequest"
       responses:
-        '201':
+        "201":
           description: User registered successfully
           content:
             application/json:
@@ -361,7 +361,7 @@ paths:
                   status:
                     type: string
                     example: success
-        '400':
+        "400":
           description: Bad request
           content:
             application/json:
@@ -380,15 +380,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              $ref: "#/components/schemas/LoginRequest"
       responses:
-        '200':
+        "200":
           description: Successful login
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoginResponse'
-        '400':
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
           description: Missing credentials
           content:
             application/json:
@@ -397,7 +397,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '401':
+        "401":
           description: Invalid credentials
           content:
             application/json:
@@ -416,9 +416,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RefreshRequest'
+              $ref: "#/components/schemas/RefreshRequest"
       responses:
-        '200':
+        "200":
           description: Token refreshed successfully
           content:
             application/json:
@@ -429,7 +429,7 @@ paths:
                     type: string
                   refresh_token:
                     type: string
-        '400':
+        "400":
           description: Missing refresh token
           content:
             application/json:
@@ -438,7 +438,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '401':
+        "401":
           description: Invalid or expired refresh token
           content:
             application/json:
@@ -459,9 +459,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ChangePasswordRequest'
+              $ref: "#/components/schemas/ChangePasswordRequest"
       responses:
-        '200':
+        "200":
           description: Password changed successfully
           content:
             application/json:
@@ -472,7 +472,7 @@ paths:
                     type: string
                   message:
                     type: string
-        '400':
+        "400":
           description: Invalid input
           content:
             application/json:
@@ -481,7 +481,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -500,9 +500,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ResetPasswordRequest'
+              $ref: "#/components/schemas/ResetPasswordRequest"
       responses:
-        '200':
+        "200":
           description: Password reset link sent
           content:
             application/json:
@@ -513,7 +513,7 @@ paths:
                     type: string
                   message:
                     type: string
-        '400':
+        "400":
           description: Invalid input or email not found
           content:
             application/json:
@@ -535,7 +535,7 @@ paths:
           required: true
           description: Password reset token
       responses:
-        '200':
+        "200":
           description: Token is valid
           content:
             application/json:
@@ -546,7 +546,7 @@ paths:
                     type: string
                   message:
                     type: string
-        '400':
+        "400":
           description: Invalid or expired token
           content:
             application/json:
@@ -564,9 +564,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ResetPasswordConfirmRequest'
+              $ref: "#/components/schemas/ResetPasswordConfirmRequest"
       responses:
-        '200':
+        "200":
           description: Password reset successfully
           content:
             application/json:
@@ -577,7 +577,7 @@ paths:
                     type: string
                   message:
                     type: string
-        '400':
+        "400":
           description: Invalid input or token
           content:
             application/json:
@@ -599,13 +599,13 @@ paths:
           required: true
           description: Product ID
       responses:
-        '200':
+        "200":
           description: Product details retrieved successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Product'
-        '404':
+                $ref: "#/components/schemas/Product"
+        "404":
           description: Product not found
           content:
             application/json:
@@ -649,13 +649,13 @@ paths:
                 is_featured:
                   type: boolean
                 type:
-                  $ref: '#/components/schemas/Flower'
+                  $ref: "#/components/schemas/Flower"
                 options:
                   type: array
                   items:
-                    $ref: '#/components/schemas/Option'
+                    $ref: "#/components/schemas/Option"
       responses:
-        '200':
+        "200":
           description: Product updated successfully
           content:
             application/json:
@@ -667,8 +667,8 @@ paths:
                   message:
                     type: string
                   product:
-                    $ref: '#/components/schemas/Product'
-        '400':
+                    $ref: "#/components/schemas/Product"
+        "400":
           description: Invalid input
           content:
             application/json:
@@ -677,7 +677,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -686,7 +686,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '404':
+        "404":
           description: Product not found
           content:
             application/json:
@@ -710,7 +710,7 @@ paths:
           required: true
           description: Product ID
       responses:
-        '200':
+        "200":
           description: Product deleted successfully
           content:
             application/json:
@@ -721,7 +721,7 @@ paths:
                     type: string
                   message:
                     type: string
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -730,7 +730,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '404':
+        "404":
           description: Product not found
           content:
             application/json:
@@ -744,8 +744,102 @@ paths:
       tags:
         - Products
       summary: Get list of all products
+      parameters:
+        - in: query
+          name: id
+          schema:
+            type: integer
+          description: Filter by product ID.
+        - in: query
+          name: id_min
+          schema:
+            type: integer
+          description: Minimum product ID.
+        - in: query
+          name: id_max
+          schema:
+            type: integer
+          description: Maximum product ID.
+        - in: query
+          name: name
+          schema:
+            type: string
+          description: Filter by product name (partial match).
+        - in: query
+          name: price
+          schema:
+            type: number
+            format: float
+          description: Filter by exact price.
+        - in: query
+          name: price_min
+          schema:
+            type: number
+            format: float
+          description: Minimum price.
+        - in: query
+          name: price_max
+          schema:
+            type: number
+            format: float
+          description: Maximum price.
+        - in: query
+          name: quantity
+          schema:
+            type: integer
+          description: Filter by quantity.
+        - in: query
+          name: quantity_min
+          schema:
+            type: integer
+          description: Minimum quantity.
+        - in: query
+          name: quantity_max
+          schema:
+            type: integer
+          description: Maximum quantity.
+        - in: query
+          name: discount
+          schema:
+            type: integer
+          description: Filter by discount.
+        - in: query
+          name: discount_min
+          schema:
+            type: integer
+          description: Minimum discount.
+        - in: query
+          name: discount_max
+          schema:
+            type: integer
+          description: Maximum discount.
+        - in: query
+          name: short_description
+          schema:
+            type: string
+          description: Filter by short description (partial match).
+        - in: query
+          name: is_featured
+          schema:
+            type: boolean
+          description: Filter by whether the product is featured.
+        - in: query
+          name: type
+          schema:
+            $ref: "#/components/schemas/Flower"
+          description: Filter by product type.
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: Limit the number of results returned.
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: Offset the starting point of results.
       responses:
-        '200':
+        "200":
           description: List of products retrieved successfully
           content:
             application/json:
@@ -755,7 +849,7 @@ paths:
                   products:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Product'
+                      $ref: "#/components/schemas/Product"
     post:
       tags:
         - Products
@@ -787,7 +881,7 @@ paths:
                   type: integer
                   example: 30
                 type:
-                  $ref: '#/components/schemas/Flower'
+                  $ref: "#/components/schemas/Flower"
                 short_description:
                   type: string
                   example: Elegant white lilies bouquet.
@@ -800,9 +894,9 @@ paths:
                 options:
                   type: array
                   items:
-                    $ref: '#/components/schemas/Option'
+                    $ref: "#/components/schemas/Option"
       responses:
-        '201':
+        "201":
           description: Product created successfully
           content:
             application/json:
@@ -812,8 +906,8 @@ paths:
                   status:
                     type: string
                   product:
-                    $ref: '#/components/schemas/Product'
-        '400':
+                    $ref: "#/components/schemas/Product"
+        "400":
           description: Invalid input
           content:
             application/json:
@@ -822,7 +916,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '403':
+        "403":
           description: Unauthorized
           content:
             application/json:
@@ -831,23 +925,7 @@ paths:
                 properties:
                   message:
                     type: string
-  /featured_products:
-    get:
-      tags:
-        - Products
-      summary: Get list of featured products
-      responses:
-        '200':
-          description: List of featured products retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  products:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Product'
+
   /get_users:
     get:
       tags:
@@ -857,7 +935,7 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of users retrieved successfully
           content:
             application/json:
@@ -880,10 +958,10 @@ paths:
                           format: email
                           example: janedoe@example.com
                         role:
-                          $ref: '#/components/schemas/Role'
+                          $ref: "#/components/schemas/Role"
                         promocode:
-                          $ref: '#/components/schemas/Promocode'
-        '401':
+                          $ref: "#/components/schemas/Promocode"
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -908,7 +986,7 @@ paths:
           required: true
           description: User ID
       responses:
-        '200':
+        "200":
           description: User details retrieved successfully
           content:
             application/json:
@@ -929,10 +1007,10 @@ paths:
                         format: email
                         example: janedoe@example.com
                       role:
-                        $ref: '#/components/schemas/Role'
+                        $ref: "#/components/schemas/Role"
                       promocode:
-                        $ref: '#/components/schemas/Promocode'
-        '401':
+                        $ref: "#/components/schemas/Promocode"
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -941,7 +1019,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '404':
+        "404":
           description: User not found
           content:
             application/json:
@@ -979,12 +1057,12 @@ paths:
                   format: email
                   example: janedoe_new@example.com
                 role:
-                  $ref: '#/components/schemas/Role'
+                  $ref: "#/components/schemas/Role"
                 promocode_id:
                   type: integer
                   example: 2
       responses:
-        '200':
+        "200":
           description: User updated successfully
           content:
             application/json:
@@ -995,7 +1073,7 @@ paths:
                     type: string
                   message:
                     type: string
-        '400':
+        "400":
           description: Invalid input or no valid fields to update
           content:
             application/json:
@@ -1004,7 +1082,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -1013,7 +1091,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '404':
+        "404":
           description: User or Promocode not found
           content:
             application/json:
@@ -1037,7 +1115,7 @@ paths:
           required: true
           description: User ID
       responses:
-        '200':
+        "200":
           description: User deleted successfully
           content:
             application/json:
@@ -1048,7 +1126,7 @@ paths:
                     type: string
                   message:
                     type: string
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -1057,7 +1135,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '404':
+        "404":
           description: User not found
           content:
             application/json:
@@ -1078,9 +1156,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddToCartRequest'
+              $ref: "#/components/schemas/AddToCartRequest"
       responses:
-        '201':
+        "201":
           description: Products added to cart successfully
           content:
             application/json:
@@ -1092,7 +1170,7 @@ paths:
                   total_price:
                     type: number
                     format: float
-        '400':
+        "400":
           description: No products provided or invalid input
           content:
             application/json:
@@ -1101,7 +1179,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '404':
+        "404":
           description: No products found or product quantity is 0
           content:
             application/json:
@@ -1110,7 +1188,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -1127,7 +1205,7 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200':
+        "200":
           description: Cart items retrieved successfully
           content:
             application/json:
@@ -1168,8 +1246,8 @@ paths:
                           type: string
                           example: Product quantity updated
                   promocode:
-                    $ref: '#/components/schemas/Promocode'
-        '404':
+                    $ref: "#/components/schemas/Promocode"
+        "404":
           description: No products found or product quantity is 0
           content:
             application/json:
@@ -1178,7 +1256,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -1194,7 +1272,7 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200':
+        "200":
           description: Cart cleared successfully
           content:
             application/json:
@@ -1203,7 +1281,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -1237,7 +1315,7 @@ paths:
                   type: integer
                   example: 3
       responses:
-        '200':
+        "200":
           description: Cart item updated successfully
           content:
             application/json:
@@ -1246,7 +1324,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '400':
+        "400":
           description: Invalid quantity
           content:
             application/json:
@@ -1255,7 +1333,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '404':
+        "404":
           description: Cart item or associated product not found
           content:
             application/json:
@@ -1264,7 +1342,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -1287,7 +1365,7 @@ paths:
           required: true
           description: Cart Item ID
       responses:
-        '200':
+        "200":
           description: Cart item deleted successfully
           content:
             application/json:
@@ -1296,7 +1374,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '404':
+        "404":
           description: Cart item not found
           content:
             application/json:
@@ -1305,7 +1383,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -1323,13 +1401,13 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '201':
+        "201":
           description: Payment link created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BuyResponse'
-        '400':
+                $ref: "#/components/schemas/BuyResponse"
+        "400":
           description: Pending order exists or invalid input
           content:
             application/json:
@@ -1338,7 +1416,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '404':
+        "404":
           description: No products found or product quantity is 0
           content:
             application/json:
@@ -1347,7 +1425,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -1384,7 +1462,7 @@ paths:
                           type: string
                           example: paid
       responses:
-        '200':
+        "200":
           description: Webhook processed successfully
           content:
             application/json:
@@ -1395,7 +1473,7 @@ paths:
                     type: string
                   message:
                     type: string
-        '400':
+        "400":
           description: Unhandled event type
           content:
             application/json:
@@ -1414,7 +1492,7 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of orders retrieved successfully
           content:
             application/json:
@@ -1424,8 +1502,8 @@ paths:
                   orders:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Order'
-        '401':
+                      $ref: "#/components/schemas/Order"
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -1443,7 +1521,7 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of promocodes retrieved successfully
           content:
             application/json:
@@ -1453,8 +1531,8 @@ paths:
                   promocodes:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Promocode'
-        '401':
+                      $ref: "#/components/schemas/Promocode"
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -1492,7 +1570,7 @@ paths:
                   type: integer
                   example: 100
       responses:
-        '201':
+        "201":
           description: Promocode created successfully
           content:
             application/json:
@@ -1508,7 +1586,7 @@ paths:
                     format: float
                   count_usage:
                     type: integer
-        '400':
+        "400":
           description: Missing required fields or promocode already exists
           content:
             application/json:
@@ -1517,7 +1595,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -1542,7 +1620,7 @@ paths:
           required: true
           description: Promocode ID (code string)
       responses:
-        '200':
+        "200":
           description: Promocode applied successfully
           content:
             application/json:
@@ -1553,7 +1631,7 @@ paths:
                     type: string
                   message:
                     type: string
-        '404':
+        "404":
           description: Promocode not found
           content:
             application/json:
@@ -1562,7 +1640,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
@@ -1603,7 +1681,7 @@ paths:
                   type: integer
                   example: 150
       responses:
-        '200':
+        "200":
           description: Promocode updated successfully
           content:
             application/json:
@@ -1623,7 +1701,7 @@ paths:
                     format: float
                   count_usage:
                     type: integer
-        '403':
+        "403":
           description: Unauthorized (non-admin user)
           content:
             application/json:
@@ -1632,7 +1710,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '404':
+        "404":
           description: Promocode not found
           content:
             application/json:
@@ -1656,7 +1734,7 @@ paths:
           required: true
           description: Promocode code
       responses:
-        '200':
+        "200":
           description: Promocode deleted successfully
           content:
             application/json:
@@ -1667,7 +1745,7 @@ paths:
                     type: string
                   message:
                     type: string
-        '403':
+        "403":
           description: Unauthorized (non-admin user)
           content:
             application/json:
@@ -1676,7 +1754,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '404':
+        "404":
           description: Promocode not found
           content:
             application/json:
@@ -1693,7 +1771,7 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200':
+        "200":
           description: User promoted to admin successfully
           content:
             application/json:
@@ -1704,7 +1782,7 @@ paths:
                     type: string
                   message:
                     type: string
-        '404':
+        "404":
           description: User not found
           content:
             application/json:
@@ -1713,7 +1791,7 @@ paths:
                 properties:
                   message:
                     type: string
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:

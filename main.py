@@ -599,10 +599,122 @@ def modify_or_delete_product(user, product):
     else:
         return jsonify({"message": "Method not allowed"}), 405
 
+
 @app.route("/products", methods=["GET", "POST"])
 def products():
     if request.method == "GET":
-        products = Product.query.all()
+        filters = []
+        
+        # Integer fields
+        int_fields = ['id', 'quantity', 'discount']
+        # Float fields
+        float_fields = ['price']
+        # String fields
+        str_fields = ['name', 'short_description']
+        # Boolean fields
+        bool_fields = ['is_featured']
+        # Enum fields
+        enum_fields = ['type']
+
+        # Handle integer fields
+        for field in int_fields:
+            value = request.args.get(field)
+            if value is not None:
+                try:
+                    int_value = int(value)
+                    filters.append(getattr(Product, field) == int_value)
+                except ValueError:
+                    return jsonify({"error": f"Invalid value for {field}"}), 400
+
+            # Min and Max filtering
+            min_value = request.args.get(f"{field}_min")
+            max_value = request.args.get(f"{field}_max")
+            if min_value is not None:
+                try:
+                    min_int_value = int(min_value)
+                    filters.append(getattr(Product, field) >= min_int_value)
+                except ValueError:
+                    return jsonify({"error": f"Invalid min value for {field}"}), 400
+            if max_value is not None:
+                try:
+                    max_int_value = int(max_value)
+                    filters.append(getattr(Product, field) <= max_int_value)
+                except ValueError:
+                    return jsonify({"error": f"Invalid max value for {field}"}), 400
+
+        # Handle float fields
+        for field in float_fields:
+            value = request.args.get(field)
+            if value is not None:
+                try:
+                    float_value = float(value)
+                    filters.append(getattr(Product, field) == float_value)
+                except ValueError:
+                    return jsonify({"error": f"Invalid value for {field}"}), 400
+
+            # Min and Max filtering
+            min_value = request.args.get(f"{field}_min")
+            max_value = request.args.get(f"{field}_max")
+            if min_value is not None:
+                try:
+                    min_float_value = float(min_value)
+                    filters.append(getattr(Product, field) >= min_float_value)
+                except ValueError:
+                    return jsonify({"error": f"Invalid min value for {field}"}), 400
+            if max_value is not None:
+                try:
+                    max_float_value = float(max_value)
+                    filters.append(getattr(Product, field) <= max_float_value)
+                except ValueError:
+                    return jsonify({"error": f"Invalid max value for {field}"}), 400
+
+        # Handle string fields
+        for field in str_fields:
+            value = request.args.get(field)
+            if value:
+                filters.append(getattr(Product, field).ilike(f"%{value}%"))
+
+        # Handle boolean fields
+        for field in bool_fields:
+            value = request.args.get(field)
+            if value is not None:
+                if value.lower() in ['true', '1']:
+                    filters.append(getattr(Product, field).is_(True))
+                elif value.lower() in ['false', '0']:
+                    filters.append(getattr(Product, field).is_(False))
+                else:
+                    return jsonify({"error": f"Invalid boolean value for {field}"}), 400
+
+        # Handle enum fields
+        for field in enum_fields:
+            value = request.args.get(field)
+            if value:
+                try:
+                    enum_value = Flower(value)
+                    filters.append(getattr(Product, field) == enum_value)
+                except ValueError:
+                    return jsonify({"error": f"Invalid enum value for {field}"}), 400
+
+        # Build the query with filters
+        query = Product.query.filter(*filters)
+
+        # Handle limit and offset
+        limit = request.args.get('limit')
+        offset = request.args.get('offset')
+        if limit is not None:
+            try:
+                limit = int(limit)
+                query = query.limit(limit)
+            except ValueError:
+                return jsonify({"error": "Invalid value for limit"}), 400
+        if offset is not None:
+            try:
+                offset = int(offset)
+                query = query.offset(offset)
+            except ValueError:
+                return jsonify({"error": "Invalid value for offset"}), 400
+
+        products = query.all()
         products_data = [
             {
                 "id": p.id,
@@ -629,6 +741,7 @@ def products():
         return jsonify({"products": products_data}), 200
 
     return create_product()
+
 
 @role_required(Role.ADMIN)
 def create_product(current_user: User):
@@ -707,35 +820,6 @@ def create_product(current_user: User):
     }
 
     return jsonify({"status": "success", "product": product_data}), 201
-
-
-@app.route("/featured_products", methods=["GET"])
-def featured_products():
-    products = db.session.query(Product).filter_by(is_featured=True).all()
-    products_data = [
-        {
-            "id": p.id,
-            "name": p.name,
-            "price": p.price,
-            "quantity": p.quantity,
-            "short_description": p.short_description,
-            "discount": p.discount,
-            "type": p.type.value,
-            "options": [
-                {
-                    "id": option.id,
-                    "name": option.name,
-                    "description": option.description,
-                    "type": option.type.value,
-                    "images": [image.url for image in option.images],
-                }
-                for option in p.options
-            ],
-        }
-        for p in products
-    ]
-    return jsonify({"products": products_data}), 200
-
 
 
 @app.route("/get_users", methods=["GET"])
