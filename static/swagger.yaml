@@ -55,7 +55,6 @@ components:
         - DEFAULT
         - COLOR
         - SIZE
-        - MATERIAL
     User:
       type: object
       properties:
@@ -96,13 +95,6 @@ components:
         name:
           type: string
           example: Red Roses
-        price:
-          type: number
-          format: float
-          example: 29.99
-        quantity:
-          type: integer
-          example: 50
         short_description:
           type: string
           example: A beautiful bouquet of red roses.
@@ -114,6 +106,13 @@ components:
           example: true
         type:
           $ref: "#/components/schemas/Flower"
+        price:
+          type: number
+          format: float
+          example: 29.99
+        quantity:
+          type: integer
+          example: 50
         options:
           type: array
           items:
@@ -132,6 +131,13 @@ components:
           example: Choose the color of the roses.
         type:
           $ref: "#/components/schemas/OptionType"
+        price:
+          type: number
+          format: float
+          example: 19.99
+        quantity:
+          type: integer
+          example: 30
         images:
           type: array
           items:
@@ -158,6 +164,9 @@ components:
           type: integer
           example: 1
         product_id:
+          type: integer
+          example: 1
+        option_id:
           type: integer
           example: 1
         quantity:
@@ -322,6 +331,9 @@ components:
               quantity:
                 type: integer
                 example: 2
+              option_id:
+                type: integer
+                example: 1
     BuyResponse:
       type: object
       properties:
@@ -387,7 +399,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LoginResponse"
+                type: object
+                properties:
+                  access_token:
+                    type: string
         "400":
           description: Missing credentials
           content:
@@ -637,11 +652,6 @@ paths:
               properties:
                 name:
                   type: string
-                price:
-                  type: number
-                  format: float
-                quantity:
-                  type: integer
                 short_description:
                   type: string
                 discount:
@@ -650,6 +660,11 @@ paths:
                   type: boolean
                 type:
                   $ref: "#/components/schemas/Flower"
+                options_to_delete:
+                  type: array
+                  items:
+                    type: integer
+                  description: List of option IDs to delete
                 options:
                   type: array
                   items:
@@ -766,6 +781,36 @@ paths:
             type: string
           description: Filter by product name (partial match).
         - in: query
+          name: short_description
+          schema:
+            type: string
+          description: Filter by short description (partial match).
+        - in: query
+          name: discount
+          schema:
+            type: integer
+          description: Filter by discount.
+        - in: query
+          name: discount_min
+          schema:
+            type: integer
+          description: Minimum discount.
+        - in: query
+          name: discount_max
+          schema:
+            type: integer
+          description: Maximum discount.
+        - in: query
+          name: is_featured
+          schema:
+            type: boolean
+          description: Filter by whether the product is featured.
+        - in: query
+          name: type
+          schema:
+            $ref: "#/components/schemas/Flower"
+          description: Filter by product type.
+        - in: query
           name: price
           schema:
             type: number
@@ -798,36 +843,6 @@ paths:
           schema:
             type: integer
           description: Maximum quantity.
-        - in: query
-          name: discount
-          schema:
-            type: integer
-          description: Filter by discount.
-        - in: query
-          name: discount_min
-          schema:
-            type: integer
-          description: Minimum discount.
-        - in: query
-          name: discount_max
-          schema:
-            type: integer
-          description: Maximum discount.
-        - in: query
-          name: short_description
-          schema:
-            type: string
-          description: Filter by short description (partial match).
-        - in: query
-          name: is_featured
-          schema:
-            type: boolean
-          description: Filter by whether the product is featured.
-        - in: query
-          name: type
-          schema:
-            $ref: "#/components/schemas/Flower"
-          description: Filter by product type.
         - in: query
           name: limit
           schema:
@@ -865,26 +880,18 @@ paths:
               type: object
               required:
                 - name
-                - price
-                - quantity
-                - type
                 - short_description
+                - type
+                - options
               properties:
                 name:
                   type: string
                   example: White Lilies
-                price:
-                  type: number
-                  format: float
-                  example: 19.99
-                quantity:
-                  type: integer
-                  example: 30
-                type:
-                  $ref: "#/components/schemas/Flower"
                 short_description:
                   type: string
                   example: Elegant white lilies bouquet.
+                type:
+                  $ref: "#/components/schemas/Flower"
                 discount:
                   type: integer
                   example: 5
@@ -894,7 +901,33 @@ paths:
                 options:
                   type: array
                   items:
-                    $ref: "#/components/schemas/Option"
+                    type: object
+                    required:
+                      - name
+                      - type
+                      - quantity
+                    properties:
+                      name:
+                        type: string
+                        example: Color
+                      type:
+                        $ref: "#/components/schemas/OptionType"
+                      price:
+                        type: number
+                        format: float
+                        example: 19.99
+                      quantity:
+                        type: integer
+                        example: 30
+                      description:
+                        type: string
+                        example: Choose the color of the lilies.
+                      images:
+                        type: array
+                        items:
+                          type: string
+                          format: uri
+                          example: https://example.com/image1.jpg
       responses:
         "201":
           description: Product created successfully
@@ -925,7 +958,6 @@ paths:
                 properties:
                   message:
                     type: string
-
   /get_users:
     get:
       tags:
@@ -1226,25 +1258,55 @@ paths:
                         name:
                           type: string
                           example: Red Roses
-                        price:
+                        price_per_unit:
                           type: number
                           format: float
                           example: 29.99
                         quantity:
                           type: integer
                           example: 2
-                        discount:
-                          type: integer
-                          example: 10
+                        discount_factor:
+                          type: number
+                          format: float
+                          example: 0.9
+                        line_total:
+                          type: number
+                          format: float
+                          example: 53.98
                         short_description:
                           type: string
                           example: A beautiful bouquet of red roses.
-                        actual_quantity:
-                          type: integer
-                          example: 50
+                        selected_option:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              example: 1
+                            name:
+                              type: string
+                              example: Color
+                            type:
+                              $ref: "#/components/schemas/OptionType"
+                            price:
+                              type: number
+                              format: float
+                              example: 19.99
+                            quantity_available:
+                              type: integer
+                              example: 30
+                            images:
+                              type: array
+                              items:
+                                type: string
+                                format: uri
+                                example: https://example.com/image1.jpg
                         message:
                           type: string
                           example: Product quantity updated
+                  total_price:
+                    type: number
+                    format: float
+                    example: 107.96
                   promocode:
                     $ref: "#/components/schemas/Promocode"
         "404":
@@ -1400,6 +1462,17 @@ paths:
       summary: Initiate purchase of cart items
       security:
         - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customer_status:
+                  type: string
+                  description: Customer status for pricing adjustments
+                  example: fiz
       responses:
         "201":
           description: Payment link created successfully

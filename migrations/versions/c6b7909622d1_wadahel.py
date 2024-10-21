@@ -1,8 +1,8 @@
-"""db
+"""wadahel
 
-Revision ID: c2c5a4372966
+Revision ID: c6b7909622d1
 Revises: 
-Create Date: 2024-10-12 10:41:22.232296
+Create Date: 2024-10-21 22:37:33.171543
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'c2c5a4372966'
+revision = 'c6b7909622d1'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -21,10 +21,9 @@ def upgrade():
     op.create_table('product',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
-    sa.Column('price', sa.Float(), nullable=False),
-    sa.Column('quantity', sa.Integer(), nullable=False),
     sa.Column('short_description', sa.String(), nullable=False),
     sa.Column('discount', sa.Integer(), nullable=True),
+    sa.Column('is_featured', sa.Boolean(), nullable=True),
     sa.Column('type', sa.Enum('FLOWER', 'BOUQUET', name='flower'), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
@@ -39,7 +38,9 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
     sa.Column('description', sa.String(), nullable=True),
-    sa.Column('type', sa.Enum('COLOR', 'SIZE', 'MATERIAL', 'OTHER', name='optiontype'), nullable=False),
+    sa.Column('quantity', sa.Integer(), nullable=False),
+    sa.Column('price', sa.Float(), nullable=True),
+    sa.Column('type', sa.Enum('DEFAULT', 'COLOR', 'SIZE', name='optiontype'), nullable=False),
     sa.Column('product_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['product_id'], ['product.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
@@ -59,7 +60,9 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('product_id', sa.Integer(), nullable=False),
+    sa.Column('option_id', sa.Integer(), nullable=False),
     sa.Column('quantity', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['option_id'], ['option.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['product_id'], ['product.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
