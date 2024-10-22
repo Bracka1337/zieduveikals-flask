@@ -804,8 +804,6 @@ def products():
                 "discount": product.discount,
                 "type": product.type.value,
                 "is_featured": product.is_featured,
-                "price": default_option.price,
-                "quantity": default_option.quantity,
                 "options": [
                     {
                         "id": option.id,
@@ -957,6 +955,12 @@ def get_users(user):
             }
         )
     return jsonify({"users": user_list})
+
+@app.route("/is_admin", methods=["GET"])
+@role_required(Role.ADMIN)
+def is_admin(user):
+    return jsonify({"message": "User is an admin"}), 200
+
 
 
 @app.route("/user/<int:user_id>", methods=["GET", "PATCH", "DELETE"])
