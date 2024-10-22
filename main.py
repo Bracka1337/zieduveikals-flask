@@ -1314,7 +1314,7 @@ def modify_or_delete_cart_item(user, id):
 
         if quantity_diff > 0:
             if option.quantity < quantity_diff:
-                return jsonify({"message": "Insufficient stock for the selected option."}), 400
+                return jsonify({"message": "Insufficient stock for the selected option.", "max": option.quantity}), 400
         elif quantity_diff < 0:
             pass 
 
