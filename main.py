@@ -127,6 +127,9 @@ class Order(db.Model):
     order_id: Mapped[str] = mapped_column(unique=True)
     promocode_id: Mapped[int] = mapped_column(db.ForeignKey("promocode.id", ondelete='SET NULL'), nullable=True)
     
+    address: Mapped[str] = mapped_column(nullable=False)  # New field for address
+    phone_number: Mapped[str] = mapped_column(nullable=False)  # New field for phone number
+
     promocode = db.relationship(
         "Promocode",
         back_populates="orders",
@@ -144,6 +147,7 @@ class Order(db.Model):
         cascade="all, delete-orphan",
         passive_deletes=True
     )
+
 
     
 
@@ -1472,6 +1476,12 @@ def buy(user):
 
     data = request.json
 
+    address = data.get("address")
+    phone_number = data.get("phone_number")
+
+    if not address or not phone_number:
+        return jsonify({"message": "Address and phone number are required"}), 400
+
     customer_status = data.get("customer_status") 
 
     filtered = count_total_price(order_items, customer_status)
@@ -1482,7 +1492,13 @@ def buy(user):
 
     res = create_payment_link(filtered, user.current_promocode)
 
-    new_order = Order(user_id=user.id, order_id=res.id, status=Status.PENDING)
+    new_order = Order(
+        user_id=user.id,
+        order_id=res.id,
+        status=Status.PENDING,
+        address=address, 
+        phone_number=phone_number 
+    )
     new_order.promocode_id = user.current_promocode.id if user.current_promocode else None
 
     if user.current_promocode:
@@ -1507,7 +1523,6 @@ def buy(user):
 
         if price is None:
             price = db.session.query(Option).filter_by(product_id=product["product_id"], type=OptionType.DEFAULT).first().price
-
 
         if product.get("discount"):
             price *= (1 - product["discount"] / 100)
@@ -1545,6 +1560,7 @@ def buy(user):
         return jsonify({"message": "An error occurred while processing your order."}), 500
 
     return jsonify({"payment_link": res.url}), 201
+
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -1590,49 +1606,96 @@ def webhook():
 def get_orders(user):
     if user.role == Role.ADMIN:
         orders = db.session.query(Order).all()
+
+        order_list = []
+        for order in orders:
+            promocode_data = (
+                {
+                    "id": order.promocode.id,
+                    "code": order.promocode.code,
+                    "discount": order.promocode.discount,
+                    "count_usage": order.promocode.count_usage,
+                }
+                if order.promocode
+                else None
+            )
+
+            order_data = {
+                "id": order.id,
+                "status": order.status.value,
+                "created_at": order.created_at.isoformat(),
+                "user": {
+                    "id": order.user.id,
+                    "username": order.user.username,
+                    "email": order.user.email,
+                    "role": order.user.role.value,
+                },
+                "promocode": promocode_data,
+                "items": [
+                    {
+                        "id": item.id,
+                        "product_id": item.product_id,
+                        "product_name": item.product_name,
+                        "product_description": item.product_description,
+                        "product_photo": item.product_photo,
+                        "quantity": item.quantity,
+                        "price": item.price,
+                    }
+                    for item in order.items
+                ],
+            }
+            order_list.append(order_data)
+
+        return jsonify({"orders": order_list}), 200
+
     else:
         orders = db.session.query(Order).filter_by(user_id=user.id).all()
 
-    order_list = []
-    for order in orders:
-        promocode_data = (
-            {
-                "id": order.promocode.id,
-                "code": order.promocode.code,
-                "discount": order.promocode.discount,
-                "count_usage": order.promocode.count_usage,
-            }
-            if order.promocode
-            else None
-        )
-
-        order_data = {
-            "id": order.id,
-            "status": order.status.value,
-            "created_at": order.created_at.isoformat(),
-            "user": {
-                "id": order.user.id,
-                "username": order.user.username,
-                "email": order.user.email,
-                "role": order.user.role.value,
-            },
-            "promocode": promocode_data, 
-           "items": [
-                {
-                    "id": item.id,
-                    "product_id": item.product_id,  
-                    "product_name": item.product_name, 
-                    "product_description": item.product_description, 
-                    "product_photo": item.product_photo,  
-                    "quantity": item.quantity,
-                    "price": item.price,
-                }
-                for item in order.items
-            ],
+        user_data = {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "role": user.role.value
         }
-        order_list.append(order_data)
 
-    return jsonify({"orders": order_list}), 200
+        order_list = []
+        for order in orders:
+            promocode_data = (
+                {
+                    "id": order.promocode.id,
+                    "code": order.promocode.code,
+                    "discount": order.promocode.discount,
+                    "count_usage": order.promocode.count_usage,
+                }
+                if order.promocode
+                else None
+            )
+
+            order_data = {
+                "id": order.id,
+                "status": order.status.value,
+                "created_at": order.created_at.isoformat(),
+                "promocode": promocode_data,
+                "items": [
+                    {
+                        "id": item.id,
+                        "product_id": item.product_id,
+                        "product_name": item.product_name,
+                        "product_description": item.product_description,
+                        "product_photo": item.product_photo,
+                        "quantity": item.quantity,
+                        "price": item.price,
+                    }
+                    for item in order.items
+                ],
+            }
+            order_list.append(order_data)
+
+        return jsonify({
+            "user": user_data,
+            "orders": order_list
+        }), 200
+
 
 @app.route("/promocodes", methods=["POST", "GET"])
 @role_required(Role.ADMIN)
