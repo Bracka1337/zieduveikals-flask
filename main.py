@@ -470,7 +470,6 @@ def handle_product(id):
             "name": product.name,
             "short_description": product.short_description,
             "discount": product.discount,
-            "description": product.description,
             "type": product.type.value,
             "options": [
                 {
