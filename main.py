@@ -126,10 +126,10 @@ class Order(db.Model):
     order_id: Mapped[str] = mapped_column(unique=True)
     promocode_id: Mapped[int] = mapped_column(db.ForeignKey("promocode.id", ondelete='SET NULL'), nullable=True)
     
-    address: Mapped[str] = mapped_column(nullable=False)  # Existing field for address
-    phone_number: Mapped[str] = mapped_column(nullable=False)  # Existing field for phone number
-    name: Mapped[str] = mapped_column(nullable=True)  # New field for name
-    surname: Mapped[str] = mapped_column(nullable=True)  # New field for surname
+    address: Mapped[str] = mapped_column(nullable=False) 
+    phone_number: Mapped[str] = mapped_column(nullable=False) 
+    name: Mapped[str] = mapped_column(nullable=True) 
+    surname: Mapped[str] = mapped_column(nullable=True) 
 
     promocode = db.relationship(
         "Promocode",
@@ -644,7 +644,6 @@ def modify_or_delete_product(user, product):
             return jsonify({"status": "success", "message": "Product updated", "product": product_data}), 200
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Error updating product {product.id}: {e}")
             return jsonify({"message": "An error occurred while updating the product."}), 500
 
     elif request.method == "DELETE":
@@ -654,7 +653,6 @@ def modify_or_delete_product(user, product):
             return jsonify({"status": "success", "message": "Product deleted"}), 200
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Error deleting product {product.id}: {e}")
             return jsonify({"message": "An error occurred while deleting the product."}), 500
 
     else:
@@ -829,9 +827,6 @@ def products():
 
 @role_required(Role.ADMIN)
 def create_product(current_user: User):
-    if current_user.role != Role.ADMIN:
-        return jsonify({"message": "Unauthorized"}), 403
-
     data = request.json
     required = {"name", "type", "short_description"}
     if not required.issubset(data):
@@ -902,7 +897,6 @@ def create_product(current_user: User):
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f"Error creating product: {e}")
         return jsonify({"message": "An error occurred while creating the product."}), 500
 
     product_data = {
@@ -1024,7 +1018,6 @@ def handle_user(current_user, user_id):
             return jsonify({"status": "success", "message": "User updated successfully"}), 200
         except Exception as e:
             db.session.rollback()
-            app.logger.error(f"Error updating user {user_id}: {e}")
             return jsonify({"message": "An error occurred while updating the user."}), 500
 
     elif request.method == "DELETE":
@@ -1034,7 +1027,6 @@ def handle_user(current_user, user_id):
             return jsonify({"status": "success", "message": "User deleted successfully"}), 200
         except Exception as e:
             db.session.rollback()
-            app.logger.error(f"Error deleting user {user_id}: {e}")
             return jsonify({"message": "An error occurred while deleting the user."}), 500
 
     else:
@@ -1283,7 +1275,6 @@ def view_cart(user):
 
         except Exception as e:
             db.session.rollback()
-            app.logger.error(f"Error clearing cart for user {user.id}: {e}")
             return jsonify({"message": "An error occurred while clearing the cart."}), 500
 
     else:
@@ -1332,7 +1323,6 @@ def modify_or_delete_cart_item(user, id):
             return jsonify({"message": "Cart item quantity updated successfully."}), 200
         except Exception as e:
             db.session.rollback()
-            app.logger.error(f"Error updating cart item {id}: {e}")
             return jsonify({"message": "An error occurred while updating the cart item."}), 500
 
     elif request.method == "DELETE":
@@ -1342,7 +1332,6 @@ def modify_or_delete_cart_item(user, id):
             return jsonify({"message": "Cart item deleted successfully."}), 200
         except Exception as e:
             db.session.rollback()
-            app.logger.error(f"Error deleting cart item {id}: {e}")
             return jsonify({"message": "An error occurred while deleting the cart item."}), 500
 
 
@@ -1476,8 +1465,8 @@ def buy(user):
 
     address = data.get("address")
     phone_number = data.get("phone_number")
-    name = data.get("name")  # New field for name
-    surname = data.get("surname")  # New field for surname
+    name = data.get("name")  
+    surname = data.get("surname") 
 
     if not address or not phone_number or not name or not surname:
         return jsonify({"message": "Address, phone number, name, and surname are required"}), 400
@@ -1497,8 +1486,8 @@ def buy(user):
         status=Status.PENDING,
         address=address,
         phone_number=phone_number,
-        name=name,  # Set the name
-        surname=surname  # Set the surname
+        name=name, 
+        surname=surname 
     )
     new_order.promocode_id = user.current_promocode.id if user.current_promocode else None
 
@@ -1557,7 +1546,6 @@ def buy(user):
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f"Error creating order for user {user.id}: {e}")
         return jsonify({"message": "An error occurred while processing your order."}), 500
 
     return jsonify({"payment_link": res.url}), 201
@@ -1628,6 +1616,8 @@ def get_orders(user):
                 "created_at": order.created_at.isoformat(),
                 "phone_number": order.phone_number,
                 "address": order.address,
+                "name": order.name,
+                "surname": order.surname,
                 "user": {
                     "id": order.user.id,
                     "username": order.user.username,
@@ -1680,6 +1670,8 @@ def get_orders(user):
                 "status": order.status.value,
                 "created_at": order.created_at.isoformat(),
                 "promocode": promocode_data,
+                "name": order.name,
+                "surname": order.surname,
                 "items": [
                     {
                         "id": item.id,
