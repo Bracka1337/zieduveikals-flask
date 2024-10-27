@@ -17,7 +17,6 @@ from functools import wraps
 from flask_swagger_ui import get_swaggerui_blueprint
 from stripe.checkout import Session
 from flask_mail import Mail, Message
-import redis
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import aliased
 
@@ -471,7 +470,6 @@ def handle_product(id):
             "name": product.name,
             "short_description": product.short_description,
             "discount": product.discount,
-            "photo": product.photo,
             "description": product.description,
             "type": product.type.value,
             "options": [
@@ -670,7 +668,6 @@ def products():
         filters = []
         
         int_fields = ['id', 'discount']
-        float_fields = [] 
         str_fields = ['name', 'short_description']
         bool_fields = ['is_featured']
         enum_fields = ['type']
