@@ -1367,7 +1367,7 @@ def count_total_price(cart_items, customer_status):
         if product.discount is not None:
             discount_factor *= (1 - (product.discount / 100))
 
-        if customer_status == "promocode" and user.current_promocode:
+        if user.current_promocode:
             discount_factor *= (1 - (user.current_promocode.discount / 100))
 
         line_total = adjusted_quantity * price_per_unit * discount_factor
