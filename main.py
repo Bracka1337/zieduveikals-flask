@@ -128,8 +128,8 @@ class Order(db.Model):
     
     address: Mapped[str] = mapped_column(nullable=False)  # Existing field for address
     phone_number: Mapped[str] = mapped_column(nullable=False)  # Existing field for phone number
-    name: Mapped[str] = mapped_column(nullable=False)  # New field for name
-    surname: Mapped[str] = mapped_column(nullable=False)  # New field for surname
+    name: Mapped[str] = mapped_column(nullable=True)  # New field for name
+    surname: Mapped[str] = mapped_column(nullable=True)  # New field for surname
 
     promocode = db.relationship(
         "Promocode",
