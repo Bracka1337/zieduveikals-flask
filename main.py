@@ -127,8 +127,10 @@ class Order(db.Model):
     order_id: Mapped[str] = mapped_column(unique=True)
     promocode_id: Mapped[int] = mapped_column(db.ForeignKey("promocode.id", ondelete='SET NULL'), nullable=True)
     
-    address: Mapped[str] = mapped_column(nullable=False)  # New field for address
-    phone_number: Mapped[str] = mapped_column(nullable=False)  # New field for phone number
+    address: Mapped[str] = mapped_column(nullable=False)  # Existing field for address
+    phone_number: Mapped[str] = mapped_column(nullable=False)  # Existing field for phone number
+    name: Mapped[str] = mapped_column(nullable=False)  # New field for name
+    surname: Mapped[str] = mapped_column(nullable=False)  # New field for surname
 
     promocode = db.relationship(
         "Promocode",
@@ -147,6 +149,7 @@ class Order(db.Model):
         cascade="all, delete-orphan",
         passive_deletes=True
     )
+
 
 
     
@@ -1463,7 +1466,6 @@ def create_payment_link(filtered, promocode) -> Session:
 @app.route("/buy", methods=["POST"])
 @role_required(Role.USER)
 def buy(user):
-
     order_items = db.session.query(CartItem).filter_by(user_id=user.id).all()
 
     if not order_items:
@@ -1478,14 +1480,15 @@ def buy(user):
 
     address = data.get("address")
     phone_number = data.get("phone_number")
+    name = data.get("name")  # New field for name
+    surname = data.get("surname")  # New field for surname
 
-    if not address or not phone_number:
-        return jsonify({"message": "Address and phone number are required"}), 400
+    if not address or not phone_number or not name or not surname:
+        return jsonify({"message": "Address, phone number, name, and surname are required"}), 400
 
     customer_status = data.get("customer_status") 
 
     filtered = count_total_price(order_items, customer_status)
-    print(filtered)  
 
     if len(filtered["products"]) == 0:
         return jsonify({"message": "No products found or product quantity is 0"}), 404
@@ -1496,8 +1499,10 @@ def buy(user):
         user_id=user.id,
         order_id=res.id,
         status=Status.PENDING,
-        address=address, 
-        phone_number=phone_number 
+        address=address,
+        phone_number=phone_number,
+        name=name,  # Set the name
+        surname=surname  # Set the surname
     )
     new_order.promocode_id = user.current_promocode.id if user.current_promocode else None
 
@@ -1506,7 +1511,7 @@ def buy(user):
         if user.current_promocode.count_usage < 0:
             user.current_promocode.count_usage = 0
 
-    user.current_promocode = None 
+    user.current_promocode = None
 
     db.session.add(new_order)
     db.session.commit()
@@ -1514,7 +1519,7 @@ def buy(user):
     for product in filtered["products"]:
         db_product = db.session.query(Product).filter_by(id=product["product_id"]).first()
         if not db_product:
-            continue 
+            continue
 
         option_id = product.get("option_id")
         option = db.session.query(Option).filter_by(id=option_id).first() if option_id else None
@@ -1534,17 +1539,17 @@ def buy(user):
             order_id=new_order.id,
             product_id=product["product_id"],
             quantity=product["quantity"],
-            price=round(price, 2), 
+            price=round(price, 2),
             product_name=db_product.name,
-            product_description=db_product.short_description, 
-            product_photo=option.images[0].url if option and option.images else None, 
+            product_description=db_product.short_description,
+            product_photo=option.images[0].url if option and option.images else None,
         )
         db.session.add(order_item)
 
         if option:
             option.quantity -= product["quantity"]
             if option.quantity < 0:
-                option.quantity = 0 
+                option.quantity = 0
         else:
             default_option = db.session.query(Option).filter_by(product_id=db_product.id, type=OptionType.DEFAULT).first()
             if default_option:
@@ -1560,6 +1565,7 @@ def buy(user):
         return jsonify({"message": "An error occurred while processing your order."}), 500
 
     return jsonify({"payment_link": res.url}), 201
+
 
 
 @app.route("/webhook", methods=["POST"])
@@ -1624,6 +1630,8 @@ def get_orders(user):
                 "id": order.id,
                 "status": order.status.value,
                 "created_at": order.created_at.isoformat(),
+                "phone_number": order.phone_number,
+                "address": order.address,
                 "user": {
                     "id": order.user.id,
                     "username": order.user.username,
