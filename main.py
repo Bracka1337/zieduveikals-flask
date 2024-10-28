@@ -1335,7 +1335,7 @@ def modify_or_delete_cart_item(user, id):
             return jsonify({"message": "An error occurred while deleting the cart item."}), 500
 
 
-def count_total_price(cart_items, customer_status):
+def count_total_price(cart_items, customer_status, user):
    
     total_price = 0.0
     new_cart_items = []
@@ -1473,7 +1473,7 @@ def buy(user):
 
     customer_status = data.get("customer_status") 
 
-    filtered = count_total_price(order_items, customer_status)
+    filtered = count_total_price(order_items, customer_status, user)
 
     if len(filtered["products"]) == 0:
         return jsonify({"message": "No products found or product quantity is 0"}), 404
