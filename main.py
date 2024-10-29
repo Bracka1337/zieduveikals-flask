@@ -1494,10 +1494,16 @@ def buy(user):
     name = data.get("name")  
     surname = data.get("surname") 
 
+    # Validate required fields
     if not address or not phone_number or not name or not surname:
         return jsonify({"message": "Address, phone number, name, and surname are required"}), 400
 
-    customer_status = data.get("customer_status") 
+    # Validate phone number
+    phone_pattern = r"^\+?\d{10,15}$"
+    if not re.match(phone_pattern, phone_number):
+        return jsonify({"message": "Invalid phone number format. Please enter a valid phone number with only digits and an optional leading '+'"}), 400
+
+    customer_status = data.get("customer_status")
 
     filtered = count_total_price(order_items, customer_status, user)
 
@@ -1575,8 +1581,6 @@ def buy(user):
         return jsonify({"message": "An error occurred while processing your order."}), 500
 
     return jsonify({"payment_link": res.url}), 201
-
-
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
