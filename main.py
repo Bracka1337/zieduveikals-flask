@@ -19,6 +19,8 @@ from stripe.checkout import Session
 from flask_mail import Mail, Message
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import aliased
+import re
+from validate_email_address import validate_email
 
 
 load_dotenv()
@@ -236,9 +238,6 @@ class OrderItem(db.Model):
         back_populates="order_items"
     )
 
-
-
-
 class CartItem(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(db.ForeignKey("user.id", ondelete='CASCADE'))
@@ -291,10 +290,20 @@ def register():
     if not username or not email or not password:
         return jsonify({"message": "Username, email, and password are required"}), 400
 
-    user = db.session.query(User).filter_by(username=username).first()
+    email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    if not re.match(email_pattern, email):
+        return jsonify({"message": "Invalid email format"}), 400
 
-    if user:
+    if not validate_email(email, verify=True):
+        return jsonify({"message": "Email domain is invalid or disposable"}), 400
+
+    if db.session.query(User).filter_by(username=username).first():
         return jsonify({"message": "Username already exists"}), 400
+    if db.session.query(User).filter_by(email=email).first():
+        return jsonify({"message": "Email already registered"}), 400
+
+    if len(password) < 8 or not re.search(r"[A-Z]", password) or not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return jsonify({"message": "Password must be at least 8 characters long, contain at least one uppercase letter, and one special symbol"}), 400
 
     hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
@@ -343,21 +352,24 @@ def change_password(user):
 
     user = db.session.query(User).filter_by(username=user.username).first()
 
-    if bcrypt.checkpw(old_password.encode("utf-8"), user.password.encode("utf-8")):
-        hashed_password = bcrypt.hashpw(
-            new_password.encode("utf-8"), bcrypt.gensalt()
-        ).decode("utf-8")
-        db.session.query(User).filter_by(username=user.username).update(
-            {"password": hashed_password}
-        )
-        db.session.commit()
-
-        return (
-            jsonify({"status": "success", "message": "Password changed successfully"}),
-            200,
-        )
-    else:
+    if not bcrypt.checkpw(old_password.encode("utf-8"), user.password.encode("utf-8")):
         return jsonify({"message": "Invalid old password"}), 400
+
+    if bcrypt.checkpw(new_password.encode("utf-8"), user.password.encode("utf-8")):
+        return jsonify({"message": "New password must be different from the old password"}), 400
+
+    if len(new_password) < 8 or not re.search(r"[A-Z]", new_password) or not re.search(r"[!@#$%^&*(),.?\":{}|<>]", new_password):
+        return jsonify({"message": "New password must be at least 8 characters long, contain at least one uppercase letter, and one special symbol"}), 400
+
+    hashed_password = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    db.session.query(User).filter_by(username=user.username).update(
+        {"password": hashed_password}
+    )
+    db.session.commit()
+
+    return jsonify({"status": "success", "message": "Password changed successfully"}), 200
+
+
 
 @app.route("/reset-password", methods=["POST"])
 def reset_password():
@@ -878,11 +890,20 @@ def create_product(current_user: User):
         else:
             option_price = option.get("price") 
 
+
+        if option_price < 0:
+            return jsonify({"message": "Price must be non-negative"}), 400
+
+        quantity = option.get("quantity", 0)
+
+        if quantity < 0:
+            return jsonify({"message": "Quantity must be non-negative"}), 400
+
         new_option = Option(
             name=option_name,
             description=option.get("description"),
             type=option_enum,
-            quantity=option.get("quantity", 0),
+            quantity=quantity,
             price=option_price,  
             product=product
         )
@@ -1040,6 +1061,11 @@ def filter_products(products, user):
         product_id = product.get("id")
         quantity_requested = product.get("quantity", 1)
         option_id = product.get("option_id")
+
+
+        if quantity_requested < 1:
+            continue
+
 
         db_product = db.session.query(Product).filter_by(id=product_id).first()
         if not db_product:
@@ -1724,6 +1750,10 @@ def promocodes(current_user):
             )
         if Promocode.query.filter_by(code=data["code"]).first():
             return jsonify({"message": "Promocode already exists"}), 400
+
+        if data["discount"] < 0 or data["count_usage"] < 0:
+            return jsonify({"message": "Discount and count_usage must be non-negative"}), 400
+
         promo = Promocode(
             code=data["code"],
             discount=data["discount"],
@@ -1762,9 +1792,22 @@ def edit_delete_promocode(promocode, user):
 
     if request.method == "PATCH":
         data = request.json
-        promocode.code = data.get("code", promocode.code)
-        promocode.discount = data.get("discount", promocode.discount)
-        promocode.count_usage = data.get("count_usage", promocode.count_usage)
+
+        code = data.get("code", promocode.code)
+        discount = data.get("discount", promocode.discount)
+        count_usage = data.get("count_usage", promocode.count_usage)
+
+
+        if discount < 0 or count_usage < 0:
+            return jsonify({"message": "Discount and count_usage must be non-negative"}), 400
+
+        
+        promocode.code = code
+        promocode.discount = discount
+        promocode.count_usage = count_usage
+
+
+
         db.session.commit()
         return jsonify({
             "status": "success",
