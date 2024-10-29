@@ -20,7 +20,6 @@ from flask_mail import Mail, Message
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import aliased
 import re
-from validate_email_address import validate_email
 
 
 load_dotenv()
@@ -294,22 +293,36 @@ def register():
     if not re.match(email_pattern, email):
         return jsonify({"message": "Invalid email format"}), 400
 
-    if not validate_email(email, verify=True):
-        return jsonify({"message": "Email domain is invalid or disposable"}), 400
+    try:
+        domain = email.split('@')[1].lower()
+    except IndexError:
+        return jsonify({"message": "Invalid email format"}), 400
+
 
     if db.session.query(User).filter_by(username=username).first():
         return jsonify({"message": "Username already exists"}), 400
+
     if db.session.query(User).filter_by(email=email).first():
         return jsonify({"message": "Email already registered"}), 400
 
-    if len(password) < 8 or not re.search(r"[A-Z]", password) or not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
-        return jsonify({"message": "Password must be at least 8 characters long, contain at least one uppercase letter, and one special symbol"}), 400
+    if (
+        len(password) < 8 or
+        not re.search(r"[A-Z]", password) or
+        not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password)
+    ):
+        return jsonify({
+            "message": "Password must be at least 8 characters long, contain at least one uppercase letter, and one special symbol"
+        }), 400
 
     hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-    db.session.add(
-        User(username=username, email=email, password=hashed_password, role=Role.USER)
+    new_user = User(
+        username=username,
+        email=email,
+        password=hashed_password,
+        role=Role.USER  
     )
+    db.session.add(new_user)
     db.session.commit()
 
     return jsonify({"status": "success"}), 201
