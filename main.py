@@ -305,7 +305,7 @@ def send():
     )
 
     data = {
-        'FromEmail': 'kris06383@gmail.com',
+        'FromEmail': 'jznikitajz@gmail.com',
         'FromName': 'ZieduVeikals',
         'Subject': 'Your email flight plan!',
         'Text-part': 'Dear passenger, welcome to Mailjet! May the delivery force be with you!',
@@ -519,7 +519,7 @@ def reset_password():
     )
 
     data = {
-        'FromEmail': 'kris06383@gmail.com',
+        'FromEmail': 'jznikitajz@gmail.com',
         'FromName': 'ZieduVeikals',
         'Subject': 'Password Reset',
         'Text-part': 'Dear passenger, welcome to Mailjet! May the delivery force be with you!',
