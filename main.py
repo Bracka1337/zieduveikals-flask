@@ -22,6 +22,7 @@ from sqlalchemy.orm import aliased
 import re
 
 
+
 load_dotenv()
 
 ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
@@ -279,15 +280,14 @@ def role_required(role):
 
     return decorator
 
-@app.route("/register", methods=["POST"])
-def register():
-    data = request.json
-    username = data.get("username")
-    email = data.get("email")
-    password = data.get("password")
 
-    if not username or not email or not password:
-        return jsonify({"message": "Username, email, and password are required"}), 400
+@app.route("/send_email", methods=["POST"])
+def send():
+    data = request.json
+    email = data.get("email")
+
+    if not email:
+        return jsonify({"message": "Email is required"}), 400
 
     email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     if not re.match(email_pattern, email):
@@ -299,6 +299,80 @@ def register():
         return jsonify({"message": "Invalid email format"}), 400
 
 
+
+    verification_token = jwt.encode(
+        {
+            "sub": "tes",
+            "email": email,
+            "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=24), 
+        },
+        ACCESS_TOKEN_SECRET,
+        algorithm="HS256",
+    )
+
+
+    msg = Message(
+        "Verify Your Email",
+        sender="from@example.com",
+        recipients=[email],
+        html=f"""
+            <p>Hi</p>
+            <p>Thank you for registering. Please verify your email by clicking the link below:</p>
+            <p>{verification_token}</p>
+            <p>This link will expire in 24 hours.</p>
+        """,
+    )
+
+    try:
+        mail.send(msg)
+    except Exception as e:
+        db.session.delete(new_user)
+        db.session.commit()
+        return jsonify({"message": "Failed to send verification email. Please try again."}), 500
+
+    return jsonify({"status": "success", "message": "Registration successful. Please check your email to verify your account."}), 201
+
+
+
+@app.route("/verify", methods=["POST"])
+def verify():
+    data = request.json
+    token = data.get("token")
+    email = data.get("email")
+
+    if not token:
+        return jsonify({"message": "Token is required"}), 400
+
+    try:
+        decoded_token = jwt.decode(
+            token, ACCESS_TOKEN_SECRET, algorithms=["HS256"]
+        )
+        
+        token_email = decoded_token["email"]
+
+        if email != token_email:
+            return jsonify({"message": "Invalid email"}), 400
+
+
+        return jsonify({"status": "success", "message": "Email verified"}), 200
+    except jwt.ExpiredSignatureError:
+        return jsonify({"message": "Token has expired"}), 400
+    except jwt.InvalidTokenError:
+        return jsonify({"message": "Invalid token"}), 400
+
+
+@app.route("/register", methods=["POST"])
+def register():
+    data = request.json
+    username = data.get("username")
+    email = data.get("email")
+    password = data.get("password")
+    token = data.get("token")
+
+    if not username or not email or not password:
+        return jsonify({"message": "Username, email, and password are required"}), 400
+
+   
     if db.session.query(User).filter_by(username=username).first():
         return jsonify({"message": "Username already exists"}), 400
 
@@ -314,18 +388,69 @@ def register():
             "message": "Password must be at least 8 characters long, contain at least one uppercase letter, and one special symbol"
         }), 400
 
-    hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    try:
+        decoded_token = jwt.decode(
+            token, ACCESS_TOKEN_SECRET, algorithms=["HS256"]
+        )
+        
+        token_email = decoded_token["email"]
 
-    new_user = User(
-        username=username,
-        email=email,
-        password=hashed_password,
-        role=Role.USER  
-    )
-    db.session.add(new_user)
-    db.session.commit()
+        if email != token_email:
+            return jsonify({"message": "Invalid email"}), 400
 
-    return jsonify({"status": "success"}), 201
+        hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+        new_user = User(
+            username=username,
+            email=email,
+            password=hashed_password,
+            role=Role.USER  
+        )
+        db.session.add(new_user)
+        db.session.commit()
+
+
+
+        return jsonify({"status": "success", "message": "Email verified"}), 200
+    except jwt.ExpiredSignatureError:
+        return jsonify({"message": "Token has expired"}), 400
+    except jwt.InvalidTokenError:
+        return jsonify({"message": "Invalid token"}), 400
+
+   
+
+    # hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    # verification_token = jwt.encode(
+    #     {
+    #         "sub": new_user.id,
+    #         "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=24),  # Token valid for 24 hours
+    #     },
+    #     ACCESS_TOKEN_SECRET,
+    #     algorithm="HS256",
+    # )
+
+
+    # # Send Verification Email
+    # msg = Message(
+    #     "Verify Your Email",
+    #     sender="from@example.com",
+    #     recipients=[email],
+    #     html=f"""
+    #         <p>Hi {new_user.username},</p>
+    #         <p>Thank you for registering. Please verify your email by clicking the link below:</p>
+    #         <p>{verification_token}</p>
+    #         <p>This link will expire in 24 hours.</p>
+    #     """,
+    # )
+
+    # try:
+    #     mail.send(msg)
+    # except Exception as e:
+    #     db.session.delete(new_user)
+    #     db.session.commit()
+    #     return jsonify({"message": "Failed to send verification email. Please try again."}), 500
+
+    # return jsonify({"status": "success", "message": "Registration successful. Please check your email to verify your account."}), 201
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -408,7 +533,6 @@ def reset_password():
     )
 
     msg = Message(
-
         "Password Reset",
         sender="from@example.com",
         recipients=[user.email],
