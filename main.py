@@ -20,7 +20,7 @@ from flask_mail import Mail, Message
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import aliased
 import re
-
+from mailjet_rest import Client
 
 
 load_dotenv()
@@ -32,14 +32,8 @@ MODE = os.getenv("MODE", "production").lower()
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("POSTGRES_URL")
-app.config["MAIL_SERVER"] = "sandbox.smtp.mailtrap.io"
-app.config["MAIL_PORT"] = 2525
-app.config["MAIL_USE_TLS"] = True
-app.config["MAIL_USE_SSL"] = False
-app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
-app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
+mailjet = Client(auth=(os.getenv("MAIL_KEY"), os.getenv("MAIL_SECRET")))
 
-mail = Mail(app)
 CORS(app, resources={r"/*": {"origins": "*"}})
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
@@ -310,25 +304,17 @@ def send():
         algorithm="HS256",
     )
 
-
-    msg = Message(
-        "Verify Your Email",
-        sender="from@example.com",
-        recipients=[email],
-        html=f"""
-            <p>Hi</p>
-            <p>Thank you for registering. Please verify your email by clicking the link below:</p>
-            <p>{verification_token}</p>
-            <p>This link will expire in 24 hours.</p>
-        """,
-    )
-
-    try:
-        mail.send(msg)
-    except Exception as e:
-        db.session.delete(new_user)
-        db.session.commit()
-        return jsonify({"message": "Failed to send verification email. Please try again."}), 500
+    data = {
+        'FromEmail': 'kris06383@gmail.com',
+        'FromName': 'ZieduVeikals',
+        'Subject': 'Your email flight plan!',
+        'Text-part': 'Dear passenger, welcome to Mailjet! May the delivery force be with you!',
+        'Html-part': f"<p>Hi</p><p>Thank you for registering. Please verify your email by clicking the link below:</p><p>{verification_token}</p>",
+        'Recipients': [{'Email': email}]
+    }
+    result = mailjet.send.create(data=data)
+    print(result.status_code)
+    print(result.json())
 
     return jsonify({"status": "success", "message": "Registration successful. Please check your email to verify your account."}), 201
 
@@ -532,14 +518,19 @@ def reset_password():
         algorithm="HS256",
     )
 
-    msg = Message(
-        "Password Reset",
-        sender="from@example.com",
-        recipients=[user.email],
-        body=f"Click the link to reset your password: {refresh}",
-    )
+    data = {
+        'FromEmail': 'kris06383@gmail.com',
+        'FromName': 'ZieduVeikals',
+        'Subject': 'Password Reset',
+        'Text-part': 'Dear passenger, welcome to Mailjet! May the delivery force be with you!',
+        'Html-part': f"<p>Click the link to reset your password:  {refresh}</p>",
+        'Recipients': [{'Email': user.email}]
+    }
+    result = mailjet.send.create(data=data)
+    print(result.status_code)
+    print(result.json())
 
-    mail.send(msg)
+   
 
     return (
         jsonify({"status": "success", "message": "Password reset link sent to email"}),
