@@ -351,17 +351,125 @@ components:
           example: SPRING20
 
 paths:
-  /register:
+   /send_email:
     post:
       tags:
         - Authentication
-      summary: Register a new user
+      summary: Send a verification email
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RegisterRequest"
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: johndoe@example.com
+      responses:
+        "201":
+          description: Email sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Verification email sent. Please check your inbox.
+        "400":
+          description: Invalid email format or missing email
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Email is required
+  /verify:
+    post:
+      tags:
+        - Authentication
+      summary: Verify the email using the token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - token
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: johndoe@example.com
+                token:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        "200":
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Email verified successfully
+        "400":
+          description: Invalid or expired token, or mismatched email
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Invalid token
+  /register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user after verifying email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - email
+                - password
+                - token
+              properties:
+                username:
+                  type: string
+                  example: johndoe
+                email:
+                  type: string
+                  format: email
+                  example: johndoe@example.com
+                password:
+                  type: string
+                  format: password
+                  example: strongpassword123
+                token:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
       responses:
         "201":
           description: User registered successfully
@@ -373,8 +481,11 @@ paths:
                   status:
                     type: string
                     example: success
+                  message:
+                    type: string
+                    example: Registration successful. Welcome!
         "400":
-          description: Bad request
+          description: Invalid token, email mismatch, or invalid input
           content:
             application/json:
               schema:
@@ -382,6 +493,17 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Invalid token or email mismatch
+        "409":
+          description: Username or email already exists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Username already exists
   /login:
     post:
       tags:

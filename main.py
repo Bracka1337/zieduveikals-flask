@@ -1594,7 +1594,7 @@ def create_payment_link(filtered, promocode) -> Session:
         payment_method_types=["card"],
         line_items=line_items,
         mode="payment",
-        success_url=f"https://yourdomain.com/success?session_id={{CHECKOUT_SESSION_ID}}",
+        success_url=f"http://localhost:3000/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"https://yourdomain.com/cancel",
         client_reference_id=str(uuid.uuid4()),
         expires_at=int(time.time()) + 2000,
