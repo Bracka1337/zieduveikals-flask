@@ -304,12 +304,15 @@ def send():
         algorithm="HS256",
     )
 
+
+    verificaton_link = f"http://localhost:3000/login?token={verification_token}&email={email}"
+
     data = {
         'FromEmail': 'jznikitajz@gmail.com',
         'FromName': 'ZieduVeikals',
         'Subject': 'Your email flight plan!',
         'Text-part': 'Dear passenger, welcome to Mailjet! May the delivery force be with you!',
-        'Html-part': f"<p>Hi</p><p>Thank you for registering. Please verify your email by clicking the link below:</p><p>{verification_token}</p>",
+        'Html-part': f"<p>Hi</p><p>Thank you for registering. Please verify your email by clicking the link below:</p><p>{verificaton_link}</p>",
         'Recipients': [{'Email': email}]
     }
     result = mailjet.send.create(data=data)

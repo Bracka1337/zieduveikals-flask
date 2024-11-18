@@ -351,754 +351,803 @@ components:
           example: SPRING20
 
 paths:
-   /send_email:
-    post:
-      tags:
-        - Authentication
-      summary: Send a verification email
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - email
-              properties:
-                email:
-                  type: string
-                  format: email
-                  example: johndoe@example.com
-      responses:
-        "201":
-          description: Email sent successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: success
-                  message:
-                    type: string
-                    example: Verification email sent. Please check your inbox.
-        "400":
-          description: Invalid email format or missing email
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Email is required
-  /verify:
-    post:
-      tags:
-        - Authentication
-      summary: Verify the email using the token
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - email
-                - token
-              properties:
-                email:
-                  type: string
-                  format: email
-                  example: johndoe@example.com
-                token:
-                  type: string
-                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-      responses:
-        "200":
-          description: Email verified successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: success
-                  message:
-                    type: string
-                    example: Email verified successfully
-        "400":
-          description: Invalid or expired token, or mismatched email
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Invalid token
-  /register:
-    post:
-      tags:
-        - Authentication
-      summary: Register a new user after verifying email
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - username
-                - email
-                - password
-                - token
-              properties:
-                username:
-                  type: string
-                  example: johndoe
-                email:
-                  type: string
-                  format: email
-                  example: johndoe@example.com
-                password:
-                  type: string
-                  format: password
-                  example: strongpassword123
-                token:
-                  type: string
-                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-      responses:
-        "201":
-          description: User registered successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: success
-                  message:
-                    type: string
-                    example: Registration successful. Welcome!
-        "400":
-          description: Invalid token, email mismatch, or invalid input
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Invalid token or email mismatch
-        "409":
-          description: Username or email already exists
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Username already exists
-  /login:
-    post:
-      tags:
-        - Authentication
-      summary: Login a user
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LoginRequest"
-      responses:
-        "200":
-          description: Successful login
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  access_token:
-                    type: string
-        "400":
-          description: Missing credentials
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Invalid credentials
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /refresh:
-    post:
-      tags:
-        - Authentication
-      summary: Refresh access token
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RefreshRequest"
-      responses:
-        "200":
-          description: Token refreshed successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  access_token:
-                    type: string
-                  refresh_token:
-                    type: string
-        "400":
-          description: Missing refresh token
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Invalid or expired refresh token
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /change_password:
-    patch:
-      tags:
-        - Authentication
-      summary: Change user password
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ChangePasswordRequest"
-      responses:
-        "200":
-          description: Password changed successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
-        "400":
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /reset-password:
-    post:
-      tags:
-        - Authentication
-      summary: Initiate password reset
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ResetPasswordRequest"
-      responses:
-        "200":
-          description: Password reset link sent
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
-        "400":
-          description: Invalid input or email not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /reset:
-    get:
-      tags:
-        - Authentication
-      summary: Verify password reset token
-      parameters:
-        - in: query
-          name: token
-          schema:
-            type: string
+    /send_email:
+      post:
+        tags:
+          - Authentication
+        summary: Send a verification email
+        requestBody:
           required: true
-          description: Password reset token
-      responses:
-        "200":
-          description: Token is valid
           content:
             application/json:
               schema:
                 type: object
+                required:
+                  - email
                 properties:
-                  status:
+                  email:
                     type: string
-                  message:
-                    type: string
-        "400":
-          description: Invalid or expired token
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-    post:
-      tags:
-        - Authentication
-      summary: Reset password using token
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ResetPasswordConfirmRequest"
-      responses:
-        "200":
-          description: Password reset successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
-        "400":
-          description: Invalid input or token
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /product/{id}:
-    get:
-      tags:
-        - Products
-      summary: Get product details by ID
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: integer
+                    format: email
+                    example: johndoe@example.com
+        responses:
+          "201":
+            description: Email sent successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      example: success
+                    message:
+                      type: string
+                      example: Verification email sent. Please check your inbox.
+          "400":
+            description: Invalid email format or missing email
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+                      example: Email is required
+    /verify:
+      post:
+        tags:
+          - Authentication
+        summary: Verify the email using the token
+        requestBody:
           required: true
-          description: Product ID
-      responses:
-        "200":
-          description: Product details retrieved successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Product"
-        "404":
-          description: Product not found
+                type: object
+                required:
+                  - email
+                  - token
+                properties:
+                  email:
+                    type: string
+                    format: email
+                    example: johndoe@example.com
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        responses:
+          "200":
+            description: Email verified successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      example: success
+                    message:
+                      type: string
+                      example: Email verified successfully
+          "400":
+            description: Invalid or expired token, or mismatched email
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+                      example: Invalid token
+    /register:
+      post:
+        tags:
+          - Authentication
+        summary: Register a new user after verifying email
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - username
+                  - email
+                  - password
+                  - token
+                properties:
+                  username:
+                    type: string
+                    example: johndoe
+                  email:
+                    type: string
+                    format: email
+                    example: johndoe@example.com
+                  password:
+                    type: string
+                    format: password
+                    example: strongpassword123
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        responses:
+          "201":
+            description: User registered successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      example: success
+                    message:
+                      type: string
+                      example: Registration successful. Welcome!
+          "400":
+            description: Invalid token, email mismatch, or invalid input
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+                      example: Invalid token or email mismatch
+          "409":
+            description: Username or email already exists
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+                      example: Username already exists
+    /login:
+      post:
+        tags:
+          - Authentication
+        summary: Login a user
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginRequest"
+        responses:
+          "200":
+            description: Successful login
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    access_token:
+                      type: string
+          "400":
+            description: Missing credentials
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "401":
+            description: Invalid credentials
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /refresh:
+      post:
+        tags:
+          - Authentication
+        summary: Refresh access token
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshRequest"
+        responses:
+          "200":
+            description: Token refreshed successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    access_token:
+                      type: string
+                    refresh_token:
+                      type: string
+          "400":
+            description: Missing refresh token
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "401":
+            description: Invalid or expired refresh token
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /change_password:
+      patch:
+        tags:
+          - Authentication
+        summary: Change user password
+        security:
+          - BearerAuth: []
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangePasswordRequest"
+        responses:
+          "200":
+            description: Password changed successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+          "400":
+            description: Invalid input
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /reset-password:
+      post:
+        tags:
+          - Authentication
+        summary: Initiate password reset
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResetPasswordRequest"
+        responses:
+          "200":
+            description: Password reset link sent
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+          "400":
+            description: Invalid input or email not found
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /reset:
+      get:
+        tags:
+          - Authentication
+        summary: Verify password reset token
+        parameters:
+          - in: query
+            name: token
+            schema:
+              type: string
+            required: true
+            description: Password reset token
+        responses:
+          "200":
+            description: Token is valid
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+          "400":
+            description: Invalid or expired token
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+      post:
+        tags:
+          - Authentication
+        summary: Reset password using token
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResetPasswordConfirmRequest"
+        responses:
+          "200":
+            description: Password reset successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+          "400":
+            description: Invalid input or token
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /product/{id}:
+      get:
+        tags:
+          - Products
+        summary: Get product details by ID
+        parameters:
+          - in: path
+            name: id
+            schema:
+              type: integer
+            required: true
+            description: Product ID
+        responses:
+          "200":
+            description: Product details retrieved successfully
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Product"
+          "404":
+            description: Product not found
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+      patch:
+        tags:
+          - Products
+          - Admin
+        summary: Update product details
+        security:
+          - BearerAuth: []
+        parameters:
+          - in: path
+            name: id
+            schema:
+              type: integer
+            required: true
+            description: Product ID
+        requestBody:
+          required: true
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  message:
+                  name:
                     type: string
-    patch:
-      tags:
-        - Products
-        - Admin
-      summary: Update product details
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: integer
-          required: true
-          description: Product ID
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                short_description:
-                  type: string
-                discount:
-                  type: integer
-                is_featured:
-                  type: boolean
-                type:
-                  $ref: "#/components/schemas/Flower"
-                options_to_delete:
-                  type: array
-                  items:
+                  short_description:
+                    type: string
+                  discount:
                     type: integer
-                  description: List of option IDs to delete
-                options:
-                  type: array
-                  items:
-                    $ref: "#/components/schemas/Option"
-      responses:
-        "200":
-          description: Product updated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
-                  product:
-                    $ref: "#/components/schemas/Product"
-        "400":
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "404":
-          description: Product not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-    delete:
-      tags:
-        - Products
-        - Admin
-      summary: Delete a product by ID
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: integer
-          required: true
-          description: Product ID
-      responses:
-        "200":
-          description: Product deleted successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "404":
-          description: Product not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /products:
-    get:
-      tags:
-        - Products
-      summary: Get list of all products
-      parameters:
-        - in: query
-          name: id
-          schema:
-            type: integer
-          description: Filter by product ID.
-        - in: query
-          name: id_min
-          schema:
-            type: integer
-          description: Minimum product ID.
-        - in: query
-          name: id_max
-          schema:
-            type: integer
-          description: Maximum product ID.
-        - in: query
-          name: name
-          schema:
-            type: string
-          description: Filter by product name (partial match).
-        - in: query
-          name: short_description
-          schema:
-            type: string
-          description: Filter by short description (partial match).
-        - in: query
-          name: discount
-          schema:
-            type: integer
-          description: Filter by discount.
-        - in: query
-          name: discount_min
-          schema:
-            type: integer
-          description: Minimum discount.
-        - in: query
-          name: discount_max
-          schema:
-            type: integer
-          description: Maximum discount.
-        - in: query
-          name: is_featured
-          schema:
-            type: boolean
-          description: Filter by whether the product is featured.
-        - in: query
-          name: type
-          schema:
-            $ref: "#/components/schemas/Flower"
-          description: Filter by product type.
-        - in: query
-          name: price
-          schema:
-            type: number
-            format: float
-          description: Filter by exact price.
-        - in: query
-          name: price_min
-          schema:
-            type: number
-            format: float
-          description: Minimum price.
-        - in: query
-          name: price_max
-          schema:
-            type: number
-            format: float
-          description: Maximum price.
-        - in: query
-          name: quantity
-          schema:
-            type: integer
-          description: Filter by quantity.
-        - in: query
-          name: quantity_min
-          schema:
-            type: integer
-          description: Minimum quantity.
-        - in: query
-          name: quantity_max
-          schema:
-            type: integer
-          description: Maximum quantity.
-        - in: query
-          name: limit
-          schema:
-            type: integer
-          description: Limit the number of results returned.
-        - in: query
-          name: offset
-          schema:
-            type: integer
-          description: Offset the starting point of results.
-      responses:
-        "200":
-          description: List of products retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  products:
+                  is_featured:
+                    type: boolean
+                  type:
+                    $ref: "#/components/schemas/Flower"
+                  options_to_delete:
                     type: array
                     items:
+                      type: integer
+                    description: List of option IDs to delete
+                  options:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Option"
+        responses:
+          "200":
+            description: Product updated successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+                    product:
                       $ref: "#/components/schemas/Product"
-    post:
-      tags:
-        - Products
-        - Admin
-      summary: Create a new product
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
+          "400":
+            description: Invalid input
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "404":
+            description: Product not found
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+      delete:
+        tags:
+          - Products
+          - Admin
+        summary: Delete a product by ID
+        security:
+          - BearerAuth: []
+        parameters:
+          - in: path
+            name: id
             schema:
-              type: object
-              required:
-                - name
-                - short_description
-                - type
-                - options
-              properties:
-                name:
-                  type: string
-                  example: White Lilies
-                short_description:
-                  type: string
-                  example: Elegant white lilies bouquet.
-                type:
-                  $ref: "#/components/schemas/Flower"
-                discount:
-                  type: integer
-                  example: 5
-                is_featured:
-                  type: boolean
-                  example: false
-                options:
-                  type: array
-                  items:
-                    type: object
-                    required:
-                      - name
-                      - type
-                      - quantity
-                    properties:
-                      name:
-                        type: string
-                        example: Color
-                      type:
-                        $ref: "#/components/schemas/OptionType"
-                      price:
-                        type: number
-                        format: float
-                        example: 19.99
-                      quantity:
-                        type: integer
-                        example: 30
-                      description:
-                        type: string
-                        example: Choose the color of the lilies.
-                      images:
-                        type: array
-                        items:
-                          type: string
-                          format: uri
-                          example: https://example.com/image1.jpg
-      responses:
-        "201":
-          description: Product created successfully
+              type: integer
+            required: true
+            description: Product ID
+        responses:
+          "200":
+            description: Product deleted successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "404":
+            description: Product not found
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /products:
+      get:
+        tags:
+          - Products
+        summary: Get list of all products
+        parameters:
+          - in: query
+            name: id
+            schema:
+              type: integer
+            description: Filter by product ID.
+          - in: query
+            name: id_min
+            schema:
+              type: integer
+            description: Minimum product ID.
+          - in: query
+            name: id_max
+            schema:
+              type: integer
+            description: Maximum product ID.
+          - in: query
+            name: name
+            schema:
+              type: string
+            description: Filter by product name (partial match).
+          - in: query
+            name: short_description
+            schema:
+              type: string
+            description: Filter by short description (partial match).
+          - in: query
+            name: discount
+            schema:
+              type: integer
+            description: Filter by discount.
+          - in: query
+            name: discount_min
+            schema:
+              type: integer
+            description: Minimum discount.
+          - in: query
+            name: discount_max
+            schema:
+              type: integer
+            description: Maximum discount.
+          - in: query
+            name: is_featured
+            schema:
+              type: boolean
+            description: Filter by whether the product is featured.
+          - in: query
+            name: type
+            schema:
+              $ref: "#/components/schemas/Flower"
+            description: Filter by product type.
+          - in: query
+            name: price
+            schema:
+              type: number
+              format: float
+            description: Filter by exact price.
+          - in: query
+            name: price_min
+            schema:
+              type: number
+              format: float
+            description: Minimum price.
+          - in: query
+            name: price_max
+            schema:
+              type: number
+              format: float
+            description: Maximum price.
+          - in: query
+            name: quantity
+            schema:
+              type: integer
+            description: Filter by quantity.
+          - in: query
+            name: quantity_min
+            schema:
+              type: integer
+            description: Minimum quantity.
+          - in: query
+            name: quantity_max
+            schema:
+              type: integer
+            description: Maximum quantity.
+          - in: query
+            name: limit
+            schema:
+              type: integer
+            description: Limit the number of results returned.
+          - in: query
+            name: offset
+            schema:
+              type: integer
+            description: Offset the starting point of results.
+        responses:
+          "200":
+            description: List of products retrieved successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    products:
+                      type: array
+                      items:
+                        $ref: "#/components/schemas/Product"
+      post:
+        tags:
+          - Products
+          - Admin
+        summary: Create a new product
+        security:
+          - BearerAuth: []
+        requestBody:
+          required: true
           content:
             application/json:
               schema:
                 type: object
+                required:
+                  - name
+                  - short_description
+                  - type
+                  - options
                 properties:
-                  status:
+                  name:
                     type: string
-                  product:
-                    $ref: "#/components/schemas/Product"
-        "400":
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
+                    example: White Lilies
+                  short_description:
                     type: string
-        "403":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /get_users:
-    get:
-      tags:
-        - Users
-        - Admin
-      summary: Get list of all users (excluding the current admin)
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: List of users retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  users:
+                    example: Elegant white lilies bouquet.
+                  type:
+                    $ref: "#/components/schemas/Flower"
+                  discount:
+                    type: integer
+                    example: 5
+                  is_featured:
+                    type: boolean
+                    example: false
+                  options:
                     type: array
                     items:
+                      type: object
+                      required:
+                        - name
+                        - type
+                        - quantity
+                      properties:
+                        name:
+                          type: string
+                          example: Color
+                        type:
+                          $ref: "#/components/schemas/OptionType"
+                        price:
+                          type: number
+                          format: float
+                          example: 19.99
+                        quantity:
+                          type: integer
+                          example: 30
+                        description:
+                          type: string
+                          example: Choose the color of the lilies.
+                        images:
+                          type: array
+                          items:
+                            type: string
+                            format: uri
+                            example: https://example.com/image1.jpg
+        responses:
+          "201":
+            description: Product created successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    product:
+                      $ref: "#/components/schemas/Product"
+          "400":
+            description: Invalid input
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "403":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /get_users:
+      get:
+        tags:
+          - Users
+          - Admin
+        summary: Get list of all users (excluding the current admin)
+        security:
+          - BearerAuth: []
+        responses:
+          "200":
+            description: List of users retrieved successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    users:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            example: 2
+                          username:
+                            type: string
+                            example: janedoe
+                          email:
+                            type: string
+                            format: email
+                            example: janedoe@example.com
+                          role:
+                            $ref: "#/components/schemas/Role"
+                          promocode:
+                            $ref: "#/components/schemas/Promocode"
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /user/{user_id}:
+      get:
+        tags:
+          - Users
+          - Admin
+        summary: Get user details by ID
+        security:
+          - BearerAuth: []
+        parameters:
+          - in: path
+            name: user_id
+            schema:
+              type: integer
+            required: true
+            description: User ID
+        responses:
+          "200":
+            description: User details retrieved successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    user:
                       type: object
                       properties:
                         id:
@@ -1115,902 +1164,853 @@ paths:
                           $ref: "#/components/schemas/Role"
                         promocode:
                           $ref: "#/components/schemas/Promocode"
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /user/{user_id}:
-    get:
-      tags:
-        - Users
-        - Admin
-      summary: Get user details by ID
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: user_id
-          schema:
-            type: integer
-          required: true
-          description: User ID
-      responses:
-        "200":
-          description: User details retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  user:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                        example: 2
-                      username:
-                        type: string
-                        example: janedoe
-                      email:
-                        type: string
-                        format: email
-                        example: janedoe@example.com
-                      role:
-                        $ref: "#/components/schemas/Role"
-                      promocode:
-                        $ref: "#/components/schemas/Promocode"
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "404":
-          description: User not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-    patch:
-      tags:
-        - Users
-        - Admin
-      summary: Update user details by ID
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: user_id
-          schema:
-            type: integer
-          required: true
-          description: User ID
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                username:
-                  type: string
-                  example: janedoe_updated
-                email:
-                  type: string
-                  format: email
-                  example: janedoe_new@example.com
-                role:
-                  $ref: "#/components/schemas/Role"
-                promocode_id:
-                  type: integer
-                  example: 2
-      responses:
-        "200":
-          description: User updated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
-        "400":
-          description: Invalid input or no valid fields to update
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "404":
-          description: User or Promocode not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-    delete:
-      tags:
-        - Users
-        - Admin
-      summary: Delete a user by ID
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: user_id
-          schema:
-            type: integer
-          required: true
-          description: User ID
-      responses:
-        "200":
-          description: User deleted successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "404":
-          description: User not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /add:
-    post:
-      tags:
-        - Cart
-      summary: Add products to cart
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AddToCartRequest"
-      responses:
-        "201":
-          description: Products added to cart successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  total_price:
-                    type: number
-                    format: float
-        "400":
-          description: No products provided or invalid input
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "404":
-          description: No products found or product quantity is 0
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /cart:
-    get:
-      tags:
-        - Cart
-      summary: View cart items
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: Cart items retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  cart_items:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                          example: 1
-                        product_id:
-                          type: integer
-                          example: 1
-                        name:
-                          type: string
-                          example: Red Roses
-                        price_per_unit:
-                          type: number
-                          format: float
-                          example: 29.99
-                        quantity:
-                          type: integer
-                          example: 2
-                        discount_factor:
-                          type: number
-                          format: float
-                          example: 0.9
-                        line_total:
-                          type: number
-                          format: float
-                          example: 53.98
-                        short_description:
-                          type: string
-                          example: A beautiful bouquet of red roses.
-                        selected_option:
-                          type: object
-                          properties:
-                            id:
-                              type: integer
-                              example: 1
-                            name:
-                              type: string
-                              example: Color
-                            type:
-                              $ref: "#/components/schemas/OptionType"
-                            price:
-                              type: number
-                              format: float
-                              example: 19.99
-                            quantity_available:
-                              type: integer
-                              example: 30
-                            images:
-                              type: array
-                              items:
-                                type: string
-                                format: uri
-                                example: https://example.com/image1.jpg
-                        message:
-                          type: string
-                          example: Product quantity updated
-                  total_price:
-                    type: number
-                    format: float
-                    example: 107.96
-                  promocode:
-                    $ref: "#/components/schemas/Promocode"
-        "404":
-          description: No products found or product quantity is 0
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-    delete:
-      tags:
-        - Cart
-      summary: Clear all items from cart
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: Cart cleared successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /cart/{id}:
-    patch:
-      tags:
-        - Cart
-      summary: Update cart item quantity
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: integer
-          required: true
-          description: Cart Item ID
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                quantity:
-                  type: integer
-                  example: 3
-      responses:
-        "200":
-          description: Cart item updated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "400":
-          description: Invalid quantity
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "404":
-          description: Cart item or associated product not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-    delete:
-      tags:
-        - Cart
-      summary: Delete a specific cart item
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: integer
-          required: true
-          description: Cart Item ID
-      responses:
-        "200":
-          description: Cart item deleted successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "404":
-          description: Cart item not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /buy:
-    post:
-      tags:
-        - Orders
-        - Payments
-      summary: Initiate purchase of cart items
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                customer_status:
-                  type: string
-                  description: Customer status for pricing adjustments
-                  example: fiz
-                phone_number:
-                  type: string
-                  description: Customer phone number for delivery
-                  example: +1234567890
-                address:
-                  type: string
-                  description: Customer address for delivery
-                  example: 123 Main St, New York, NY 10001
-                name:
-                  type: string
-                  description: Customer name for delivery
-                  example: John
-                surname:
-                  type: string
-                  description: Customer surname for delivery
-                  example: Doe
-      responses:
-        "201":
-          description: Payment link created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BuyResponse"
-        "400":
-          description: Pending order exists or invalid input
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "404":
-          description: No products found or product quantity is 0
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /webhook:
-    post:
-      tags:
-        - Payments
-      summary: Stripe webhook endpoint
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                type:
-                  type: string
-                  example: checkout.session.completed
-                data:
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
                   type: object
                   properties:
-                    object:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                          example: cs_test_a1b2c3d4
-                        payment_status:
-                          type: string
-                          example: paid
-      responses:
-        "200":
-          description: Webhook processed successfully
+                    message:
+                      type: string
+          "404":
+            description: User not found
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+      patch:
+        tags:
+          - Users
+          - Admin
+        summary: Update user details by ID
+        security:
+          - BearerAuth: []
+        parameters:
+          - in: path
+            name: user_id
+            schema:
+              type: integer
+            required: true
+            description: User ID
+        requestBody:
+          required: true
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  status:
+                  username:
                     type: string
-                  message:
+                    example: janedoe_updated
+                  email:
                     type: string
-        "400":
-          description: Unhandled event type
+                    format: email
+                    example: janedoe_new@example.com
+                  role:
+                    $ref: "#/components/schemas/Role"
+                  promocode_id:
+                    type: integer
+                    example: 2
+        responses:
+          "200":
+            description: User updated successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+          "400":
+            description: Invalid input or no valid fields to update
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "404":
+            description: User or Promocode not found
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+      delete:
+        tags:
+          - Users
+          - Admin
+        summary: Delete a user by ID
+        security:
+          - BearerAuth: []
+        parameters:
+          - in: path
+            name: user_id
+            schema:
+              type: integer
+            required: true
+            description: User ID
+        responses:
+          "200":
+            description: User deleted successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "404":
+            description: User not found
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /add:
+      post:
+        tags:
+          - Cart
+        summary: Add products to cart
+        security:
+          - BearerAuth: []
+        requestBody:
+          required: true
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
-  /orders:
-    get:
-      tags:
-        - Orders
-      summary: Get list of orders
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: List of orders retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  orders:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Order"
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /promocodes:
-    get:
-      tags:
-        - Promocodes
-        - Admin
-      summary: Get list of promocodes
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: List of promocodes retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  promocodes:
-                    type: array
-                    items:
+                $ref: "#/components/schemas/AddToCartRequest"
+        responses:
+          "201":
+            description: Products added to cart successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+                    total_price:
+                      type: number
+                      format: float
+          "400":
+            description: No products provided or invalid input
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "404":
+            description: No products found or product quantity is 0
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /cart:
+      get:
+        tags:
+          - Cart
+        summary: View cart items
+        security:
+          - BearerAuth: []
+        responses:
+          "200":
+            description: Cart items retrieved successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    cart_items:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            example: 1
+                          product_id:
+                            type: integer
+                            example: 1
+                          name:
+                            type: string
+                            example: Red Roses
+                          price_per_unit:
+                            type: number
+                            format: float
+                            example: 29.99
+                          quantity:
+                            type: integer
+                            example: 2
+                          discount_factor:
+                            type: number
+                            format: float
+                            example: 0.9
+                          line_total:
+                            type: number
+                            format: float
+                            example: 53.98
+                          short_description:
+                            type: string
+                            example: A beautiful bouquet of red roses.
+                          selected_option:
+                            type: object
+                            properties:
+                              id:
+                                type: integer
+                                example: 1
+                              name:
+                                type: string
+                                example: Color
+                              type:
+                                $ref: "#/components/schemas/OptionType"
+                              price:
+                                type: number
+                                format: float
+                                example: 19.99
+                              quantity_available:
+                                type: integer
+                                example: 30
+                              images:
+                                type: array
+                                items:
+                                  type: string
+                                  format: uri
+                                  example: https://example.com/image1.jpg
+                          message:
+                            type: string
+                            example: Product quantity updated
+                    total_price:
+                      type: number
+                      format: float
+                      example: 107.96
+                    promocode:
                       $ref: "#/components/schemas/Promocode"
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-    post:
-      tags:
-        - Promocodes
-        - Admin
-      summary: Create a new promocode
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
+          "404":
+            description: No products found or product quantity is 0
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+      delete:
+        tags:
+          - Cart
+        summary: Clear all items from cart
+        security:
+          - BearerAuth: []
+        responses:
+          "200":
+            description: Cart cleared successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /cart/{id}:
+      patch:
+        tags:
+          - Cart
+        summary: Update cart item quantity
+        security:
+          - BearerAuth: []
+        parameters:
+          - in: path
+            name: id
             schema:
-              type: object
-              required:
-                - code
-                - discount
-                - count_usage
-              properties:
-                code:
-                  type: string
-                  example: SPRING20
-                discount:
-                  type: number
-                  format: float
-                  example: 20.0
-                count_usage:
-                  type: integer
-                  example: 100
-      responses:
-        "201":
-          description: Promocode created successfully
+              type: integer
+            required: true
+            description: Cart Item ID
+        requestBody:
+          required: true
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  status:
+                  quantity:
+                    type: integer
+                    example: 3
+        responses:
+          "200":
+            description: Cart item updated successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "400":
+            description: Invalid quantity
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "404":
+            description: Cart item or associated product not found
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+      delete:
+        tags:
+          - Cart
+        summary: Delete a specific cart item
+        security:
+          - BearerAuth: []
+        parameters:
+          - in: path
+            name: id
+            schema:
+              type: integer
+            required: true
+            description: Cart Item ID
+        responses:
+          "200":
+            description: Cart item deleted successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "404":
+            description: Cart item not found
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /buy:
+      post:
+        tags:
+          - Orders
+          - Payments
+        summary: Initiate purchase of cart items
+        security:
+          - BearerAuth: []
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customer_status:
                     type: string
+                    description: Customer status for pricing adjustments
+                    example: fiz
+                  phone_number:
+                    type: string
+                    description: Customer phone number for delivery
+                    example: +1234567890
+                  address:
+                    type: string
+                    description: Customer address for delivery
+                    example: 123 Main St, New York, NY 10001
+                  name:
+                    type: string
+                    description: Customer name for delivery
+                    example: John
+                  surname:
+                    type: string
+                    description: Customer surname for delivery
+                    example: Doe
+        responses:
+          "201":
+            description: Payment link created successfully
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/BuyResponse"
+          "400":
+            description: Pending order exists or invalid input
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "404":
+            description: No products found or product quantity is 0
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /webhook:
+      post:
+        tags:
+          - Payments
+        summary: Stripe webhook endpoint
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    example: checkout.session.completed
+                  data:
+                    type: object
+                    properties:
+                      object:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            example: cs_test_a1b2c3d4
+                          payment_status:
+                            type: string
+                            example: paid
+        responses:
+          "200":
+            description: Webhook processed successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+          "400":
+            description: Unhandled event type
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+    /orders:
+      get:
+        tags:
+          - Orders
+        summary: Get list of orders
+        security:
+          - BearerAuth: []
+        responses:
+          "200":
+            description: List of orders retrieved successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    orders:
+                      type: array
+                      items:
+                        $ref: "#/components/schemas/Order"
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /promocodes:
+      get:
+        tags:
+          - Promocodes
+          - Admin
+        summary: Get list of promocodes
+        security:
+          - BearerAuth: []
+        responses:
+          "200":
+            description: List of promocodes retrieved successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    promocodes:
+                      type: array
+                      items:
+                        $ref: "#/components/schemas/Promocode"
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+      post:
+        tags:
+          - Promocodes
+          - Admin
+        summary: Create a new promocode
+        security:
+          - BearerAuth: []
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - code
+                  - discount
+                  - count_usage
+                properties:
                   code:
                     type: string
+                    example: SPRING20
                   discount:
                     type: number
                     format: float
+                    example: 20.0
                   count_usage:
                     type: integer
-        "400":
-          description: Missing required fields or promocode already exists
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /promocode/{id}:
-    post:
-      tags:
-        - Promocodes
-        - Users
-      summary: Apply a promocode to the current user
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: string
-          required: true
-          description: Promocode ID (code string)
-      responses:
-        "200":
-          description: Promocode applied successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
-        "404":
-          description: Promocode not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-    patch:
-      tags:
-        - Promocodes
-        - Admin
-      summary: Update a promocode by code
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: string
-          required: true
-          description: Promocode code
-      requestBody:
-        required: true
-        content:
-          application/json:
+                    example: 100
+        responses:
+          "201":
+            description: Promocode created successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    code:
+                      type: string
+                    discount:
+                      type: number
+                      format: float
+                    count_usage:
+                      type: integer
+          "400":
+            description: Missing required fields or promocode already exists
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /promocode/{id}:
+      post:
+        tags:
+          - Promocodes
+          - Users
+        summary: Apply a promocode to the current user
+        security:
+          - BearerAuth: []
+        parameters:
+          - in: path
+            name: id
             schema:
-              type: object
-              properties:
-                code:
-                  type: string
-                  example: SPRING25
-                discount:
-                  type: number
-                  format: float
-                  example: 25.0
-                count_usage:
-                  type: integer
-                  example: 150
-      responses:
-        "200":
-          description: Promocode updated successfully
+              type: string
+            required: true
+            description: Promocode ID (code string)
+        responses:
+          "200":
+            description: Promocode applied successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+          "404":
+            description: Promocode not found
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+      patch:
+        tags:
+          - Promocodes
+          - Admin
+        summary: Update a promocode by code
+        security:
+          - BearerAuth: []
+        parameters:
+          - in: path
+            name: id
+            schema:
+              type: string
+            required: true
+            description: Promocode code
+        requestBody:
+          required: true
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
-                  id:
-                    type: integer
                   code:
                     type: string
+                    example: SPRING25
                   discount:
                     type: number
                     format: float
+                    example: 25.0
                   count_usage:
                     type: integer
-        "403":
-          description: Unauthorized (non-admin user)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "404":
-          description: Promocode not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-    delete:
-      tags:
-        - Promocodes
-        - Admin
-      summary: Delete a promocode by code
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: string
-          required: true
-          description: Promocode code
-      responses:
-        "200":
-          description: Promocode deleted successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
-        "403":
-          description: Unauthorized (non-admin user)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "404":
-          description: Promocode not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-  /make_admin:
-    post:
-      tags:
-        - Admin
-      summary: Make current user an admin (Development only)
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: User promoted to admin successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
-        "404":
-          description: User not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
+                    example: 150
+        responses:
+          "200":
+            description: Promocode updated successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+                    id:
+                      type: integer
+                    code:
+                      type: string
+                    discount:
+                      type: number
+                      format: float
+                    count_usage:
+                      type: integer
+          "403":
+            description: Unauthorized (non-admin user)
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "404":
+            description: Promocode not found
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+      delete:
+        tags:
+          - Promocodes
+          - Admin
+        summary: Delete a promocode by code
+        security:
+          - BearerAuth: []
+        parameters:
+          - in: path
+            name: id
+            schema:
+              type: string
+            required: true
+            description: Promocode code
+        responses:
+          "200":
+            description: Promocode deleted successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+          "403":
+            description: Unauthorized (non-admin user)
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "404":
+            description: Promocode not found
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+    /make_admin:
+      post:
+        tags:
+          - Admin
+        summary: Make current user an admin (Development only)
+        security:
+          - BearerAuth: []
+        responses:
+          "200":
+            description: User promoted to admin successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+          "404":
+            description: User not found
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+          "401":
+            description: Unauthorized
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
 
 security:
   - BearerAuth: []
