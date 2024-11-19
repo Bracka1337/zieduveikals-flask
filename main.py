@@ -293,6 +293,10 @@ def send():
         return jsonify({"message": "Invalid email format"}), 400
 
 
+    already_registed = db.session.query(User).filter_by(email=email).first()
+
+    if already_registed:
+        return jsonify({"message": "Email already registered"}), 400
 
     verification_token = jwt.encode(
         {
@@ -407,40 +411,6 @@ def register():
         return jsonify({"message": "Invalid token"}), 400
 
    
-
-    # hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-    # verification_token = jwt.encode(
-    #     {
-    #         "sub": new_user.id,
-    #         "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=24),  # Token valid for 24 hours
-    #     },
-    #     ACCESS_TOKEN_SECRET,
-    #     algorithm="HS256",
-    # )
-
-
-    # # Send Verification Email
-    # msg = Message(
-    #     "Verify Your Email",
-    #     sender="from@example.com",
-    #     recipients=[email],
-    #     html=f"""
-    #         <p>Hi {new_user.username},</p>
-    #         <p>Thank you for registering. Please verify your email by clicking the link below:</p>
-    #         <p>{verification_token}</p>
-    #         <p>This link will expire in 24 hours.</p>
-    #     """,
-    # )
-
-    # try:
-    #     mail.send(msg)
-    # except Exception as e:
-    #     db.session.delete(new_user)
-    #     db.session.commit()
-    #     return jsonify({"message": "Failed to send verification email. Please try again."}), 500
-
-    # return jsonify({"status": "success", "message": "Registration successful. Please check your email to verify your account."}), 201
-
 @app.route("/login", methods=["POST"])
 def login():
     data = request.json
@@ -1493,6 +1463,7 @@ def modify_or_delete_cart_item(user, id):
 
 
 def count_total_price(cart_items, customer_status, user):
+    print(cart_items, user, customer_status)
    
     total_price = 0.0
     new_cart_items = []
@@ -1543,7 +1514,7 @@ def count_total_price(cart_items, customer_status, user):
 
 
 
-def create_payment_link(filtered, promocode) -> Session:
+def create_payment_link(filtered, promocode, customer_status) -> Session:
    
     line_items = []
     for product in filtered["products"]:
@@ -1563,6 +1534,10 @@ def create_payment_link(filtered, promocode) -> Session:
 
         if unit_price is None:
             unit_price = db.session.query(Option).filter_by(product_id=product["product_id"], type=OptionType.DEFAULT).first().price
+
+        if customer_status != "fiz":
+            unit_price *= 0.79
+
 
         if product["discount"]:
             unit_price *= (1 - product["discount"] / 100)
@@ -1625,11 +1600,9 @@ def buy(user):
     name = data.get("name")  
     surname = data.get("surname") 
 
-    # Validate required fields
     if not address or not phone_number or not name or not surname:
         return jsonify({"message": "Address, phone number, name, and surname are required"}), 400
 
-    # Validate phone number
     phone_pattern = r"^\+?\d{10,15}$"
     if not re.match(phone_pattern, phone_number):
         return jsonify({"message": "Invalid phone number format. Please enter a valid phone number with only digits and an optional leading '+'"}), 400
@@ -1638,10 +1611,12 @@ def buy(user):
 
     filtered = count_total_price(order_items, customer_status, user)
 
+    print(filtered['total_price'])
+
     if len(filtered["products"]) == 0:
         return jsonify({"message": "No products found or product quantity is 0"}), 404
 
-    res = create_payment_link(filtered, user.current_promocode)
+    res = create_payment_link(filtered, user.current_promocode, customer_status)
 
     new_order = Order(
         user_id=user.id,
